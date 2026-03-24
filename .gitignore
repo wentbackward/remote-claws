@@ -6,6 +6,7 @@ dist/
 build/
 .venv/
 .env
+.remote-claws-auth.json
 *.jpg
 *.jpeg
 *.png

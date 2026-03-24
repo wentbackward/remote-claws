@@ -13,10 +13,11 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e .
 playwright install chromium
+remote-claws-setup            # generates auth token (shown once) and saves hash
 remote-claws                  # starts SSE server on 0.0.0.0:8080
 ```
 
-Agents connect to `http://<ip>:8080/sse`. Entry point is `remote_claws.server:main`.
+Agents connect to `http://<ip>:8080/sse` with `Authorization: Bearer <token>`. Entry point is `remote_claws.server:main`. The server refuses to start without an auth file — run `remote-claws-setup` first.
 
 ## Configuration
 
@@ -24,6 +25,11 @@ All config via environment variables with `REMOTE_CLAWS_` prefix (Pydantic Setti
 - `REMOTE_CLAWS_PORT`, `REMOTE_CLAWS_HOST`, `REMOTE_CLAWS_BROWSER_HEADLESS`, `REMOTE_CLAWS_BROWSER_CHANNEL`
 - `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`
 - `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
+- `REMOTE_CLAWS_AUTH_FILE` (default: `.remote-claws-auth.json`)
+
+## Authentication
+
+Bearer token auth via the MCP SDK's `TokenVerifier`. Run `remote-claws-setup` to generate a token — it prints the raw token once and stores only the SHA-256 hash in `.remote-claws-auth.json`. The server loads the hash at startup and the SDK validates `Authorization: Bearer <token>` on every connection. Timing-safe comparison via `hmac.compare_digest`.
 
 ## Architecture
 

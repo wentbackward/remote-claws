@@ -4,8 +4,11 @@ import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+import sys
+
 from mcp.server.fastmcp import FastMCP
 
+from remote_claws.auth import HashedTokenVerifier, load_token_hash
 from remote_claws.config import AppConfig
 from remote_claws.browser.manager import BrowserManager
 from remote_claws.permissions import PermissionChecker
@@ -139,10 +142,66 @@ register_file_tools(mcp)
 
 
 def main():
+    import asyncio
+    import uvicorn
+    from starlette.middleware import Middleware
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from starlette.types import ASGIApp, Receive, Scope, Send
+
     config = AppConfig()
+
+    # Load auth — refuse to start without it
+    try:
+        token_hash = load_token_hash(config.auth_file)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    verifier = HashedTokenVerifier(token_hash)
+
+    # Bearer token middleware
+    class BearerTokenMiddleware:
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            request = Request(scope)
+            auth_header = request.headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                response = JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
+                await response(scope, receive, send)
+                return
+
+            token = auth_header[7:]
+            result = await verifier.verify_token(token)
+            if result is None:
+                response = JSONResponse({"error": "Invalid bearer token"}, status_code=401)
+                await response(scope, receive, send)
+                return
+
+            await self.app(scope, receive, send)
+
+    # Get the Starlette app from FastMCP SSE and wrap with auth
     mcp.settings.host = config.host
     mcp.settings.port = config.port
-    mcp.run(transport="sse")
+    starlette_app = mcp.sse_app()
+    starlette_app.add_middleware(BearerTokenMiddleware)
+
+    logger.info("Auth enabled — bearer token required for all connections")
+
+    uvicorn_config = uvicorn.Config(
+        starlette_app,
+        host=config.host,
+        port=config.port,
+        log_level="info",
+    )
+    server = uvicorn.Server(uvicorn_config)
+    asyncio.run(server.serve())
 
 
 if __name__ == "__main__":

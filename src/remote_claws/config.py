@@ -15,3 +15,4 @@ class AppConfig(BaseSettings):
     screenshot_quality: int = 75
     screenshot_dir: str = ""
     permissions_file: str = "permissions.json"
+    auth_file: str = ".remote-claws-auth.json"
