@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "browser": {
+      "allow": ["*"],
+      "deny": []
+    },
+    "desktop": {
+      "allow": ["*"],
+      "deny": []
+    },
+    "exec": {
+      "allow": ["*"],
+      "deny": []
+    },
+    "files": {
+      "allow": ["*"],
+      "deny": []
+    }
+  }
+}
