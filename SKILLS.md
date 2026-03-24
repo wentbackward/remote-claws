@@ -1,8 +1,8 @@
-# SKILLS.md — PyWinMCP Capabilities
+# SKILLS.md — Remote Claws Capabilities
 
 ## What This Server Provides
 
-PyWinMCP gives an AI agent full control of a remote Windows desktop machine — the same kind of control a human sitting at the keyboard and screen would have. It is an MCP server that exposes tools over SSE/HTTP.
+Remote Claws gives an AI agent full control of a remote desktop machine — the same kind of control a human sitting at the keyboard and screen would have. It is an MCP server that exposes tools over SSE/HTTP.
 
 ## Skill: Remote Desktop Control
 

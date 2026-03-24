@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PYWINMCP_")
+    model_config = SettingsConfigDict(env_prefix="REMOTE_CLAWS_")
 
     host: str = "0.0.0.0"
     port: int = 8080

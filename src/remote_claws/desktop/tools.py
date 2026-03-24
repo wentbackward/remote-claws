@@ -6,7 +6,7 @@ import json
 import pyautogui
 from mcp.server.fastmcp import FastMCP, Context, Image
 
-from pywinmcp.screenshot import downscale_and_encode, make_save_path
+from remote_claws.screenshot import downscale_and_encode, make_save_path
 
 # Keep failsafe enabled — moving mouse to (0,0) aborts
 pyautogui.FAILSAFE = True

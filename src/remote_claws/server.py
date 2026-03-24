@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 from mcp.server.fastmcp import FastMCP
 
-from pywinmcp.config import AppConfig
-from pywinmcp.browser.manager import BrowserManager
-from pywinmcp.permissions import PermissionChecker
+from remote_claws.config import AppConfig
+from remote_claws.browser.manager import BrowserManager
+from remote_claws.permissions import PermissionChecker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ async def app_lifespan(server: FastMCP):
     browser = BrowserManager(config)
     permissions = PermissionChecker(config.permissions_file)
     processes: dict = {}
-    logger.info("PyWinMCP starting up (host=%s, port=%s)", config.host, config.port)
+    logger.info("RemoteClaws starting up (host=%s, port=%s)", config.host, config.port)
     try:
         yield AppContext(config=config, browser=browser, permissions=permissions, processes=processes)
     finally:
@@ -41,11 +41,11 @@ async def app_lifespan(server: FastMCP):
                 except Exception:
                     pass
         await browser.shutdown()
-        logger.info("PyWinMCP shut down")
+        logger.info("RemoteClaws shut down")
 
 
 SERVER_INSTRUCTIONS = """\
-You are controlling a remote Windows PC with a graphical desktop. You have four \
+You are controlling a remote machine with a graphical desktop. You have four \
 tool groups: browser, desktop, exec, and files. Some tools may be disabled by \
 the server's permission policy — if a tool returns "Permission denied", do not \
 retry it.
@@ -121,16 +121,16 @@ exec_kill when done.
 """
 
 mcp = FastMCP(
-    "PyWinMCP",
+    "RemoteClaws",
     instructions=SERVER_INSTRUCTIONS,
     lifespan=app_lifespan,
 )
 
 # Register all tool groups
-from pywinmcp.browser.tools import register as register_browser_tools
-from pywinmcp.desktop.tools import register as register_desktop_tools
-from pywinmcp.exec.tools import register as register_exec_tools
-from pywinmcp.files.tools import register as register_file_tools
+from remote_claws.browser.tools import register as register_browser_tools
+from remote_claws.desktop.tools import register as register_desktop_tools
+from remote_claws.exec.tools import register as register_exec_tools
+from remote_claws.files.tools import register as register_file_tools
 
 register_browser_tools(mcp)
 register_desktop_tools(mcp)

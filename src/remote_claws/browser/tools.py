@@ -4,7 +4,7 @@ import json
 
 from mcp.server.fastmcp import FastMCP, Context, Image
 
-from pywinmcp.screenshot import downscale_and_encode, make_save_path
+from remote_claws.screenshot import downscale_and_encode, make_save_path
 
 
 def _get_ctx(ctx: Context):

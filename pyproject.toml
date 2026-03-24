@@ -1,7 +1,7 @@
 [project]
-name = "pywinmcp"
+name = "remote-claws"
 version = "0.1.0"
-description = "MCP server for remote Windows PC control"
+description = "MCP server for remote machine control — browser, desktop, exec, and file transfer"
 requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.20",
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pywinmcp = "pywinmcp.server:main"
+remote-claws = "remote_claws.server:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

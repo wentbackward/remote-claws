@@ -5,7 +5,7 @@ import logging
 
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 
-from pywinmcp.config import AppConfig
+from remote_claws.config import AppConfig
 
 logger = logging.getLogger(__name__)
 

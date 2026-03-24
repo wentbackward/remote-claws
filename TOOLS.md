@@ -1,6 +1,6 @@
-# TOOLS.md — PyWinMCP Tool Reference
+# TOOLS.md — Remote Claws Tool Reference
 
-Complete reference for all 39 tools exposed by PyWinMCP. Tools are organized into four permission groups: `browser`, `desktop`, `exec`, and `files`. Each tool can be individually allowed or denied in `permissions.json`.
+Complete reference for all 39 tools exposed by Remote Claws. Tools are organized into four permission groups: `browser`, `desktop`, `exec`, and `files`. Each tool can be individually allowed or denied in `permissions.json`.
 
 ---
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-PyWinMCP is a Python MCP (Model Context Protocol) server for remote Windows PC control. It exposes 39 tools over SSE/HTTP across four groups: browser automation (Playwright), desktop control (pyautogui/pywinauto), async command execution, and file transfer.
+Remote Claws is an MCP (Model Context Protocol) server for remote machine control. It exposes 39 tools over SSE/HTTP across four groups: browser automation (Playwright), desktop control (pyautogui/pywinauto), async command execution, and file transfer.
 
 ## Setup & Running
 
@@ -13,17 +13,17 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e .
 playwright install chromium
-pywinmcp                      # starts SSE server on 0.0.0.0:8080
+remote-claws                  # starts SSE server on 0.0.0.0:8080
 ```
 
-Agents connect to `http://<ip>:8080/sse`. Entry point is `pywinmcp.server:main`.
+Agents connect to `http://<ip>:8080/sse`. Entry point is `remote_claws.server:main`.
 
 ## Configuration
 
-All config via environment variables with `PYWINMCP_` prefix (Pydantic Settings in `config.py`):
-- `PYWINMCP_PORT`, `PYWINMCP_HOST`, `PYWINMCP_BROWSER_HEADLESS`, `PYWINMCP_BROWSER_CHANNEL`
-- `PYWINMCP_SCREENSHOT_MAX_WIDTH`, `PYWINMCP_SCREENSHOT_MAX_HEIGHT`, `PYWINMCP_SCREENSHOT_QUALITY`
-- `PYWINMCP_PERMISSIONS_FILE` (default: `permissions.json`)
+All config via environment variables with `REMOTE_CLAWS_` prefix (Pydantic Settings in `config.py`):
+- `REMOTE_CLAWS_PORT`, `REMOTE_CLAWS_HOST`, `REMOTE_CLAWS_BROWSER_HEADLESS`, `REMOTE_CLAWS_BROWSER_CHANNEL`
+- `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`
+- `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
 
 ## Architecture
 
