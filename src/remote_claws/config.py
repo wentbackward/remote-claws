@@ -59,6 +59,7 @@ class AppConfig(BaseSettings):
     screenshot_quality: int = 75
     screenshot_dir: str = ""
     permissions_file: str = "permissions.json"
+    allowed_ips: str = ""  # comma-separated; empty = allow all (rely on token auth only)
     auth_file: str = ".remote-claws-auth.json"
     config_file: str = "remote-claws.json"  # optional JSON config overlay
 
@@ -73,6 +74,13 @@ class AppConfig(BaseSettings):
         # reads env vars automatically, so we just merge file values under them)
         merged = {**file_values, **overrides}
         super().__init__(**merged)
+
+    def get_allowed_ips(self) -> list[str]:
+        """Parse allowed_ips into a list. Returns [] to disable IP filtering."""
+        raw = self.allowed_ips.strip()
+        if not raw:
+            return []
+        return [ip.strip() for ip in raw.split(",") if ip.strip()]
 
     def get_allowed_hosts(self) -> list[str]:
         """Parse allowed_hosts into a list. Returns ["*"] to disable checking."""

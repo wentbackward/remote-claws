@@ -81,13 +81,33 @@ To rotate the token, run `remote-claws-setup` again.
 
 Use `"*"` to allow/deny an entire group. Omitting a group denies it entirely.
 
-### Network Security
+### IP Allowlist
 
-The bearer token protects against unauthorized access, but for production deployments you should also restrict network access:
+Lock the server to specific source IPs. Connections from any other IP are rejected with 403 before auth is even checked:
 
-- Run behind a VPN (Tailscale, WireGuard)
-- Use firewall rules to whitelist agent IPs
-- Put it behind a reverse proxy with TLS
+```bash
+REMOTE_CLAWS_ALLOWED_IPS="100.82.48.9,100.106.2.100" remote-claws
+```
+
+Or in `remote-claws.json`:
+```json
+{ "allowed_ips": "100.82.48.9,100.106.2.100" }
+```
+
+When empty (the default), IP filtering is disabled and access relies on bearer token auth alone.
+
+### Defense in Depth
+
+The server has three independent security layers, outermost first:
+
+1. **IP allowlist** — rejects connections from unknown IPs (403, before any processing)
+2. **Bearer token** — rejects unauthenticated requests (401, timing-safe hash comparison)
+3. **Permission policy** — restricts which tools are available (per-tool granularity)
+
+For production, also consider:
+- Run behind a VPN (Tailscale, WireGuard) for encrypted transport
+- Use firewall rules as an additional network-level gate
+- Put behind a reverse proxy with TLS for encryption in transit
 
 ## Connecting Agents
 
@@ -231,7 +251,8 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 |----------|---------|-------------|
 | `REMOTE_CLAWS_HOST` | `0.0.0.0` | Bind address |
 | `REMOTE_CLAWS_PORT` | `8080` | Listen port |
-| `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. Set to specific IPs/hostnames for remote access (e.g. `localhost,100.82.48.9`). `*` disables host checking. |
+| `REMOTE_CLAWS_ALLOWED_IPS` | *(empty)* | Comma-separated source IPs allowed to connect. Empty = no IP filtering (rely on token auth). Checked before auth. |
+| `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. `*` disables host checking. |
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
 | `REMOTE_CLAWS_PERMISSIONS_FILE` | `permissions.json` | Path to permission policy |
 | `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chromium headless |

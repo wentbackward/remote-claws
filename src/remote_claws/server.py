@@ -194,12 +194,32 @@ def main():
 
             await self.app(scope, receive, send)
 
+    # Source IP allowlist middleware — drops connections before any other processing
+    class IPAllowlistMiddleware:
+        def __init__(self, app: ASGIApp, allowed_ips: list[str]) -> None:
+            self.app = app
+            self.allowed_ips = set(allowed_ips)
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] == "http":
+                client = scope.get("client")
+                client_ip = client[0] if client else None
+                if client_ip not in self.allowed_ips:
+                    logger.warning("Rejected connection from %s (not in allowed_ips)", client_ip)
+                    response = JSONResponse(
+                        {"error": "Forbidden — source IP not allowed"},
+                        status_code=403,
+                    )
+                    await response(scope, receive, send)
+                    return
+            await self.app(scope, receive, send)
+
     # Get the Starlette app from FastMCP SSE and wrap with middleware
     mcp.settings.host = config.host
     mcp.settings.port = config.port
     starlette_app = mcp.sse_app()
 
-    # Host header validation — prevents 421 errors from remote connections
+    # Host header validation
     allowed_hosts = config.get_allowed_hosts()
     if allowed_hosts != ["*"]:
         from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -208,8 +228,14 @@ def main():
     else:
         logger.info("Host checking disabled (allowed_hosts='*')")
 
-    # Auth must be outermost (added last = runs first)
+    # Bearer token auth
     starlette_app.add_middleware(BearerTokenMiddleware)
+
+    # IP allowlist — outermost layer (added last = runs first)
+    allowed_ips = config.get_allowed_ips()
+    if allowed_ips:
+        starlette_app.add_middleware(IPAllowlistMiddleware, allowed_ips=allowed_ips)
+        logger.info("IP allowlist enabled: %s", ", ".join(allowed_ips))
 
     logger.info("Auth enabled — bearer token required for all connections")
 
