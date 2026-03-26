@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import sys
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from remote_claws.auth import HashedTokenVerifier, load_token_hash
 from remote_claws.config import AppConfig
@@ -127,6 +128,13 @@ mcp = FastMCP(
     "RemoteClaws",
     instructions=SERVER_INSTRUCTIONS,
     lifespan=app_lifespan,
+    # Disable MCP SDK's built-in DNS rebinding protection — we're a remote
+    # server by design, and we protect access via bearer token auth instead.
+    # Without this, the SDK rejects any Host header that isn't localhost,
+    # which breaks all remote connections (Tailscale, LAN, VPN) with 421.
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
 )
 
 # Register all tool groups
