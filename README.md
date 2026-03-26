@@ -203,17 +203,22 @@ Header: Authorization: Bearer YOUR_TOKEN_HERE
 
 ### Config File (`remote-claws.json`)
 
-Drop a `remote-claws.json` in the working directory to set defaults. Values support `${ENV_VAR}` expansion and `${ENV_VAR:-default}` fallback:
+Drop a `remote-claws.json` in the working directory to set defaults. Every setting from the env var table below can be set here. Values support `${ENV_VAR}` expansion and `${ENV_VAR:-default}` fallback:
 
 ```json
 {
-  "host": "0.0.0.0",
-  "port": 8080,
-  "allowed_hosts": "${TAILSCALE_IP:-*}",
+  "host": "192.168.1.50",
+  "port": 9090,
+  "allowed_hosts": "localhost,${TAILSCALE_IP:-127.0.0.1}",
   "browser_headless": false,
   "screenshot_quality": 85,
   "auth_file": "${HOME}/.remote-claws-auth.json"
 }
+```
+
+Copy `remote-claws.example.json` as a starting point:
+```bash
+cp remote-claws.example.json remote-claws.json
 ```
 
 You can also use a `.env` file alongside it — pydantic-settings reads `.env` files automatically.
