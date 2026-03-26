@@ -66,6 +66,12 @@ Use Remote Claws tools whenever you need to interact with the remote desktop mac
 - `file_move` — move or rename file/directory
 - `file_info` — get size, created, modified timestamps
 
+## Authentication & Security
+
+The remote-claws MCP server requires a bearer token, configured in `openclaw.json` when registering the server. The server will reject unauthenticated connections with 401.
+
+The server also supports IP allowlisting (`allowed_ips`), host header validation (`allowed_hosts`), and per-tool permission policies (`permissions.json`) to restrict which tools are available. See the [setup guide](https://github.com/wentbackward/remote-claws/blob/master/remote-claws-openclaw-setup-guide.md) and [README](https://github.com/wentbackward/remote-claws#security) for configuration details.
+
 ## Important Notes
 
 - Screenshots are JPEG, max 1280x960. Coordinates are absolute pixels.
