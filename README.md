@@ -39,11 +39,17 @@ This prints a bearer token **once** — copy it now. Only the SHA-256 hash is st
 
 ### Start the Server
 
+The server runs in the **foreground** — keep the terminal open while agents are connected. There is no background/service mode yet; this keeps things simple and visible while the project stabilizes.
+
 ```bash
+# Activate the venv first (every new terminal session)
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux/macOS
+
 remote-claws
 ```
 
-The server starts on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/sse` with the bearer token.
+The server starts on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/sse` with the bearer token. You'll see tool calls logged in the terminal as agents use them.
 
 ## Security
 
@@ -161,6 +167,29 @@ agent = Agent(
 3. Add a custom header: `Authorization: Bearer YOUR_TOKEN_HERE`
 4. The node auto-discovers all 39 tools
 
+### OpenClaw
+
+Add to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "remote-claws": {
+        "url": "http://YOUR_IP:8080/sse",
+        "headers": {
+          "Authorization": "Bearer YOUR_TOKEN_HERE"
+        }
+      }
+    }
+  }
+}
+```
+
+Then restart the gateway: `openclaw gateway restart`
+
+For a detailed walkthrough including skill installation and troubleshooting, see [remote-claws-openclaw-setup-guide.md](remote-claws-openclaw-setup-guide.md).
+
 ### Any MCP Client
 
 Remote Claws works with any MCP-compliant client. Connect to the SSE endpoint and pass the bearer token:
@@ -172,12 +201,32 @@ Header: Authorization: Bearer YOUR_TOKEN_HERE
 
 ## Configuration
 
-All settings are configured via environment variables with the `REMOTE_CLAWS_` prefix:
+### Config File (`remote-claws.json`)
+
+Drop a `remote-claws.json` in the working directory to set defaults. Values support `${ENV_VAR}` expansion and `${ENV_VAR:-default}` fallback:
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "allowed_hosts": "${TAILSCALE_IP:-*}",
+  "browser_headless": false,
+  "screenshot_quality": 85,
+  "auth_file": "${HOME}/.remote-claws-auth.json"
+}
+```
+
+You can also use a `.env` file alongside it — pydantic-settings reads `.env` files automatically.
+
+### Environment Variables
+
+Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REMOTE_CLAWS_HOST` | `0.0.0.0` | Bind address |
 | `REMOTE_CLAWS_PORT` | `8080` | Listen port |
+| `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. Set to specific IPs/hostnames for remote access (e.g. `localhost,100.82.48.9`). `*` disables host checking. |
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
 | `REMOTE_CLAWS_PERMISSIONS_FILE` | `permissions.json` | Path to permission policy |
 | `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chromium headless |
@@ -186,6 +235,28 @@ All settings are configured via environment variables with the `REMOTE_CLAWS_` p
 | `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT` | `960` | Max screenshot height |
 | `REMOTE_CLAWS_SCREENSHOT_QUALITY` | `75` | JPEG quality (1-100) |
 | `REMOTE_CLAWS_SCREENSHOT_DIR` | *(empty)* | Directory to save screenshots (when `save_to_disk=true`) |
+| `REMOTE_CLAWS_CONFIG_FILE` | `remote-claws.json` | Path to the JSON config file |
+
+### Priority
+
+Highest wins: **env vars** → **config file** → **built-in defaults**
+
+### Troubleshooting: 421 Errors
+
+If agents connecting over a VPN or remote IP get `421 Misdirected Request`, the server is rejecting the `Host` header. Fix:
+
+```bash
+# Allow your Tailscale IP
+REMOTE_CLAWS_ALLOWED_HOSTS="localhost,127.0.0.1,100.82.48.9" remote-claws
+
+# Or disable host checking entirely (if you trust your network)
+REMOTE_CLAWS_ALLOWED_HOSTS="*" remote-claws
+```
+
+Or set it in `remote-claws.json`:
+```json
+{ "allowed_hosts": "localhost,127.0.0.1,100.82.48.9" }
+```
 
 ## How It Works
 

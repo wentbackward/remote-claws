@@ -21,11 +21,15 @@ Agents connect to `http://<ip>:8080/sse` with `Authorization: Bearer <token>`. E
 
 ## Configuration
 
-All config via environment variables with `REMOTE_CLAWS_` prefix (Pydantic Settings in `config.py`):
+Three-layer config: env vars (`REMOTE_CLAWS_` prefix) override `remote-claws.json` which overrides built-in defaults. The JSON file supports `${ENV_VAR}` and `${ENV_VAR:-default}` expansion. See `config.py`.
+
+Key settings:
+- `REMOTE_CLAWS_ALLOWED_HOSTS` (default: `*`): comma-separated trusted Host headers. Set to specific IPs when connecting over VPN/Tailscale to avoid 421 errors. `*` disables host checking.
 - `REMOTE_CLAWS_PORT`, `REMOTE_CLAWS_HOST`, `REMOTE_CLAWS_BROWSER_HEADLESS`, `REMOTE_CLAWS_BROWSER_CHANNEL`
 - `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`
 - `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
 - `REMOTE_CLAWS_AUTH_FILE` (default: `.remote-claws-auth.json`)
+- `REMOTE_CLAWS_CONFIG_FILE` (default: `remote-claws.json`)
 
 ## Authentication
 

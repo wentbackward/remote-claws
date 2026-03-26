@@ -186,10 +186,21 @@ def main():
 
             await self.app(scope, receive, send)
 
-    # Get the Starlette app from FastMCP SSE and wrap with auth
+    # Get the Starlette app from FastMCP SSE and wrap with middleware
     mcp.settings.host = config.host
     mcp.settings.port = config.port
     starlette_app = mcp.sse_app()
+
+    # Host header validation — prevents 421 errors from remote connections
+    allowed_hosts = config.get_allowed_hosts()
+    if allowed_hosts != ["*"]:
+        from starlette.middleware.trustedhost import TrustedHostMiddleware
+        starlette_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+        logger.info("Trusted hosts: %s", ", ".join(allowed_hosts))
+    else:
+        logger.info("Host checking disabled (allowed_hosts='*')")
+
+    # Auth must be outermost (added last = runs first)
     starlette_app.add_middleware(BearerTokenMiddleware)
 
     logger.info("Auth enabled — bearer token required for all connections")

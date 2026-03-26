@@ -1,0 +1,12 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "allowed_hosts": "*",
+  "browser_headless": false,
+  "browser_channel": "chromium",
+  "screenshot_max_width": 1280,
+  "screenshot_max_height": 960,
+  "screenshot_quality": 75,
+  "permissions_file": "permissions.json",
+  "auth_file": ".remote-claws-auth.json"
+}
