@@ -51,4 +51,4 @@ The server runs on the target Windows machine and listens for MCP clients over S
 - Screenshots are JPEG at max 1280x960. Fine detail (small text, icons) may require a zoomed-in region screenshot.
 - File transfers are base64 — there is overhead for very large files. Use chunked reads (offset/limit) to manage memory.
 - The browser is Chromium only. Firefox and WebKit are not available.
-- This server has no built-in authentication. Secure it at the network level (firewall, VPN, Tailscale) or add token auth before exposing to untrusted networks.
+- The server requires bearer token authentication. For additional protection, use IP allowlisting and run behind a VPN (Tailscale, WireGuard).
