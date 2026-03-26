@@ -1,4 +1,4 @@
-# Remote Claws — start server
+# Remote Claws - start server
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $root
@@ -15,11 +15,12 @@ try {
     }
 
     if (-not (Test-Path ".remote-claws-auth.json")) {
-        Write-Host "No auth token found — running setup..." -ForegroundColor Yellow
+        Write-Host "No auth token found - running setup..." -ForegroundColor Yellow
         remote-claws-setup
     }
 
-    Write-Host "`nStarting Remote Claws..." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Starting Remote Claws..." -ForegroundColor Green
     remote-claws
 } finally {
     Pop-Location
