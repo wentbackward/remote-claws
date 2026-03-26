@@ -1,5 +1,10 @@
 # Remote Claws
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
+[![GitHub](https://img.shields.io/github/stars/wentbackward/remote-claws?style=social)](https://github.com/wentbackward/remote-claws)
+
 An MCP server that gives AI agents full control of a remote desktop machine — browser automation, mouse/keyboard, command execution, and file transfer. Deploy it on a PC, connect your agent, and let it work.
 
 ## What It Does
