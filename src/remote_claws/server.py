@@ -416,6 +416,11 @@ def main():
     # operator, resources are shared, reconnect = reattach the same tab).
     mcp.settings.host = config.host
     mcp.settings.port = config.port
+    # The SDK's streamable_http_app() creates a route at
+    # streamable_http_path (default "/mcp"). We mount that app at "/mcp" on
+    # the parent Starlette, so the SDK's internal path must be "/" —
+    # otherwise the full path becomes "/mcp/mcp" and clients get 404/307.
+    mcp.settings.streamable_http_path = "/"
     sse_app = mcp.sse_app()
     streamable_app = mcp.streamable_http_app()
 
