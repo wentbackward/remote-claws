@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.20",
     "playwright>=1.40",
+    "tf-playwright-stealth>=1.1",  # detection-evasion patches applied per-page
     "pyautogui>=0.9.54",
     "pywinauto>=0.6.8",
     "Pillow>=10.0",
@@ -15,6 +16,7 @@ dependencies = [
 [project.scripts]
 remote-claws = "remote_claws.server:main"
 remote-claws-setup = "remote_claws.setup_auth:main"
+remote-claws-browser-setup = "remote_claws.browser.setup:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

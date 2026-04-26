@@ -47,6 +47,30 @@ def main() -> None:
     print("  Only the hash is stored on disk.")
     print()
     print("=" * 60)
+    print()
+
+    _maybe_run_browser_setup()
+
+
+def _maybe_run_browser_setup() -> None:
+    """Offer to chain into the browser-profile setup. Skipped silently when
+    stdin is not a TTY (e.g. piped invocation in CI) so this remains safe
+    to call from automation.
+    """
+    if not sys.stdin.isatty():
+        return
+    response = input(
+        "Set up the dedicated Chrome profile now so the agent can\n"
+        "browse with your identity (sign into services, install adblocker,\n"
+        "accept cookie banners)? [Y/n] "
+    ).strip().lower()
+    if response and response not in {"y", "yes"}:
+        print("Skipped. Run `remote-claws-browser-setup` later when ready.")
+        return
+    # Imported lazily so a missing browser dep (Chrome not installed yet)
+    # doesn't break auth-only setup runs.
+    from remote_claws.browser.setup import run_browser_setup
+    run_browser_setup()
 
 
 if __name__ == "__main__":

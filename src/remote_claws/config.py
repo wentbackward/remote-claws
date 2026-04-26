@@ -53,7 +53,23 @@ class AppConfig(BaseSettings):
     port: int = 8080
     allowed_hosts: str = "*"  # comma-separated; "*" disables host checking
     browser_headless: bool = False
-    browser_channel: str = "chromium"
+    # Default to real Chrome so the server browses with a normal-looking
+    # fingerprint and can pass the bot walls / paywalls that bundled
+    # Playwright Chromium trips. Set to "chromium" to fall back to the
+    # bundled test build (lightweight, repeatable, useful for internal sites
+    # and CI — but visibly automated to anti-bot vendors).
+    browser_channel: str = "chrome"
+    # Persistent Chrome profile directory. Holds cookies, logins, extensions
+    # across server restarts so the agent browses with the user's identity
+    # on services they explicitly signed into via remote-claws-browser-setup.
+    # Empty string = use the OS-appropriate default (see
+    # remote_claws.browser.profile.default_profile_dir).
+    browser_profile_dir: str = ""
+    # Apply tf-playwright-stealth to every new page. Removes the residual
+    # automation tells (navigator.webdriver, missing chrome.runtime, etc.)
+    # that survive even when driving real Chrome via Playwright. Disable
+    # only if a site is misbehaving under the patches.
+    browser_stealth: bool = True
     screenshot_max_width: int = 1280
     screenshot_max_height: int = 960
     screenshot_quality: int = 75

@@ -55,8 +55,18 @@ async def app_lifespan(server: FastMCP):
     if permissions.is_group_active("browser"):
         # Local import: avoid pulling Playwright into memory when the browser
         # group is disabled.
-        from remote_claws.browser.manager import BrowserManager
+        from remote_claws.browser.manager import BrowserManager, BrowserStartupError
         browser = BrowserManager(config)
+        # Validate the browser environment before we start serving. The
+        # server is purposefully manually-run and non-daemon, so a hard
+        # failure here is the right behaviour: the operator sees the error
+        # immediately rather than discovering it through a confused agent
+        # an hour into a session.
+        try:
+            browser.preflight()
+        except BrowserStartupError as exc:
+            logger.error("Browser preflight failed: %s", exc)
+            raise
 
     logger.info("RemoteClaws starting up (host=%s, port=%s)", config.host, config.port)
     try:
