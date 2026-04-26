@@ -327,7 +327,15 @@ def main():
         log_level="info",
     )
     server = uvicorn.Server(uvicorn_config)
-    asyncio.run(server.serve())
+    # uvicorn handles SIGINT internally and shuts itself down cleanly, but on
+    # Python 3.11+ asyncio.run() re-raises the KeyboardInterrupt afterwards,
+    # which would otherwise dump a full traceback over the operator's clean
+    # shutdown log. Catch it and exit quietly — the server is purposefully
+    # interactive and Ctrl+C is the documented way to stop it.
+    try:
+        asyncio.run(server.serve())
+    except KeyboardInterrupt:
+        logger.info("Interrupted — exiting.")
 
 
 if __name__ == "__main__":
