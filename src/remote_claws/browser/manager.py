@@ -41,7 +41,7 @@ class BrowserManager:
         self._pages: list[Page] = []
         self._active_index: int = 0
         self._lock = asyncio.Lock()
-        self._stealth_apply = self._build_stealth_applier()
+        self._stealth_apply, self._stealth_status = self._build_stealth_applier()
 
     # ----- startup-time check (no Playwright launch) ------------------------
 
@@ -158,7 +158,7 @@ class BrowserManager:
                 self._config.browser_channel,
                 self._profile_dir,
                 self._config.browser_headless,
-                self._config.browser_stealth,
+                self._stealth_status,
             )
 
     async def _new_page_with_stealth(self) -> Page:
@@ -172,12 +172,15 @@ class BrowserManager:
         return page
 
     def _build_stealth_applier(self):
-        """Return an async callable that applies stealth to a page, or None
-        when stealth is disabled / unavailable. Resolved once at construction
-        so the per-page hot path doesn't keep re-importing.
+        """Resolve the per-page stealth callable once at construction time.
+
+        Returns (apply_fn, status_string). status_string is what we log so
+        operators can see at a glance whether stealth is actually active
+        ('active'), disabled by config ('disabled'), or requested but the
+        library is missing ('unavailable: install tf-playwright-stealth').
         """
         if not self._config.browser_stealth:
-            return None
+            return None, "disabled"
         try:
             # tf-playwright-stealth ships under the playwright_stealth name
             # and exposes a Stealth class with apply_stealth_async().
@@ -185,12 +188,13 @@ class BrowserManager:
         except ImportError:
             logger.warning(
                 "browser_stealth=true but playwright_stealth is not installed; "
-                "continuing without stealth patches"
+                "continuing without stealth patches. Run: "
+                "pip install tf-playwright-stealth"
             )
-            return None
+            return None, "unavailable (pip install tf-playwright-stealth)"
         stealth = Stealth()
 
         async def _apply(page: Page) -> None:
             await stealth.apply_stealth_async(page)
 
-        return _apply
+        return _apply, "active"

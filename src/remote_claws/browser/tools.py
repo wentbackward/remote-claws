@@ -27,11 +27,34 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         return fn
 
     @expose
-    async def browser_navigate(url: str, ctx: Context) -> str:
-        """Navigate the browser to a URL. Returns page title, final URL, and HTTP status."""
+    async def browser_navigate(
+        url: str,
+        wait_until: str = "load",
+        settle_ms: int = 0,
+        timeout: int = 30000,
+        ctx: Context = None,
+    ) -> str:
+        """Navigate the browser to a URL.
+
+        wait_until: Playwright lifecycle event to block on. One of
+          'commit'           — navigation committed (very early; no DOM)
+          'domcontentloaded' — HTML parsed (early; SPAs not hydrated)
+          'load'             — 'load' event fired (default; safe for most sites)
+          'networkidle'      — no network for 500ms (slow / hangs on long-poll sites)
+        settle_ms: extra wall-clock pause after the lifecycle event, in
+          milliseconds. Useful for SPA hydration or letting an anti-bot
+          challenge (e.g. Cloudflare interstitial) self-resolve before you
+          start scraping.
+        timeout: navigation timeout in milliseconds.
+
+        Returns page title, final URL, and HTTP status.
+        """
+        import asyncio as _asyncio
         app = _get_ctx(ctx)
         page = await app.browser.get_page()
-        response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        response = await page.goto(url, wait_until=wait_until, timeout=timeout)
+        if settle_ms > 0:
+            await _asyncio.sleep(settle_ms / 1000)
         status = response.status if response else "unknown"
         title = await page.title()
         return f"Navigated to {page.url} (title: {title}, status: {status})"

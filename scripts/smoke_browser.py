@@ -175,16 +175,26 @@ async def run_smoke(driver: Driver) -> None:
     ok(f"browser tools: {', '.join(browser_names[:5])}{' ...' if len(browser_names) > 5 else ''}")
 
     # ---- 1. x.com
-    step(1, "Open https://x.com and pull visible posts")
-    nav = await driver.call("browser_navigate", url="https://x.com")
+    step(1, "Open https://x.com/home and pull visible posts")
+    # /home goes straight to the timeline when signed in (the bare /
+    # serves a marketing splash even for logged-in users). wait_until=load
+    # + a settle pause give X's SPA time to hydrate the feed before we
+    # scrape — domcontentloaded fires far too early for a JS-driven app.
+    nav = await driver.call(
+        "browser_navigate",
+        url="https://x.com/home",
+        wait_until="load",
+        settle_ms=4000,
+    )
     if nav: ok(text_of(nav).strip())
 
-    # X loads its primary column lazily; wait briefly for it before scraping.
+    # Wait for either a tweet article (signed in) or the sign-in form
+    # (signed out) so the script can report which it saw.
     await driver.call(
         "browser_wait_for",
-        selector='[data-testid="primaryColumn"]',
+        selector='article, [data-testid="loginButton"]',
         state="visible",
-        timeout=15000,
+        timeout=20000,
     )
 
     posts = await driver.call(
@@ -218,8 +228,26 @@ async def run_smoke(driver: Driver) -> None:
 
     # ---- 2. bloomberg.com
     step(2, "Open https://www.bloomberg.com and scrape headlines + first story link")
-    nav = await driver.call("browser_navigate", url="https://www.bloomberg.com")
-    if nav: ok(text_of(nav).strip())
+    # Bloomberg sits behind a Cloudflare JS challenge that resolves itself
+    # in a few seconds with real Chrome + stealth. settle_ms gives the
+    # challenge time to clear before we scrape, otherwise we'd get the
+    # interstitial HTML (title 'Are you a robot?', status 403).
+    nav = await driver.call(
+        "browser_navigate",
+        url="https://www.bloomberg.com",
+        wait_until="load",
+        settle_ms=6000,
+    )
+    if nav:
+        nav_text = text_of(nav).strip()
+        ok(nav_text)
+        if "robot" in nav_text.lower() or "status: 403" in nav_text:
+            warn(
+                "Cloudflare challenge appears to still be up. Check the "
+                "server log for the 'Browser context launched ... stealth=...' "
+                "line: stealth must say 'active'. If it says 'unavailable', "
+                "run `pip install tf-playwright-stealth` on the server."
+            )
 
     # Bloomberg's headline markup shifts; scan every anchor and pick ones
     # whose href looks like an article URL. Returns up to 8 headline+href
@@ -267,7 +295,12 @@ async def run_smoke(driver: Driver) -> None:
         fail("no target URL available; skipping story navigation")
         return
     print(f"    target: {target_url}")
-    nav = await driver.call("browser_navigate", url=target_url)
+    nav = await driver.call(
+        "browser_navigate",
+        url=target_url,
+        wait_until="load",
+        settle_ms=3000,
+    )
     if nav: ok(text_of(nav).strip())
 
     # Pull a chunk of the article body so the operator can see what we got

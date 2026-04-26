@@ -207,6 +207,7 @@ logger.info(
 
 
 def main():
+    import argparse
     import asyncio
     import uvicorn
     from starlette.middleware import Middleware
@@ -214,7 +215,30 @@ def main():
     from starlette.responses import JSONResponse
     from starlette.types import ASGIApp, Receive, Scope, Send
 
+    # Argv overrides for the two settings people most often want to change
+    # ad-hoc (host/port). Env vars and the JSON config file are still the
+    # canonical configuration; argv just wins when present so users don't
+    # have to remember REMOTE_CLAWS_PORT for a one-off run.
+    parser = argparse.ArgumentParser(
+        prog="remote-claws",
+        description="Run the Remote Claws MCP server.",
+    )
+    parser.add_argument(
+        "--host",
+        help="Bind address (overrides REMOTE_CLAWS_HOST / config.host).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        help="Listen port (overrides REMOTE_CLAWS_PORT / config.port).",
+    )
+    args = parser.parse_args()
+
     config = _CONFIG
+    if args.host is not None:
+        config.host = args.host
+    if args.port is not None:
+        config.port = args.port
 
     # Load auth — refuse to start without it
     try:
