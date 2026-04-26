@@ -56,19 +56,30 @@ def run_browser_setup(url: str | None = None) -> int:
         return 1
 
     print()
-    print("=" * 60)
+    print("=" * 64)
     print("  Remote Claws \u2014 Browser Profile Setup")
-    print("=" * 60)
+    print("=" * 64)
     print()
     print(f"  Chrome:   {chrome}")
     print(f"  Profile:  {profile_dir}")
     print()
-    print("  Chrome will open in a moment. Sign into any services you want")
-    print("  the agent to be able to use (email, news, code hosts, etc.),")
-    print("  install extensions, accept cookie banners, then close the")
-    print("  window. Sessions persist across server restarts.")
+    print("  Chrome will open in a moment. While it's open:")
     print()
-    print("=" * 60)
+    print("    1. Sign into the services you want the agent to use")
+    print("       (email, news sites, code hosts, etc.)")
+    print("    2. Install any extensions you want (adblocker, etc.)")
+    print("    3. Accept cookie banners on sites you'll visit")
+    print()
+    print("  >>> WHEN YOU'RE DONE: CLOSE THE CHROME WINDOW. <<<")
+    print()
+    print("  This script is blocked waiting for Chrome to exit. Closing")
+    print("  Chrome ends setup and returns you to the terminal so you can")
+    print("  start the server with `remote-claws`. Sessions persist across")
+    print("  server restarts.")
+    print()
+    print("=" * 64)
+    print()
+    print("  Waiting for you to close Chrome...", flush=True)
     print()
 
     args = [
@@ -90,17 +101,22 @@ def run_browser_setup(url: str | None = None) -> int:
         return 130
 
     print()
+    print("=" * 64)
     if completed.returncode == 0:
-        print("Profile updated. Sign-ins are persisted.")
+        print("  Profile updated. Sign-ins are persisted.")
     else:
         # Chrome's exit codes are not particularly informative for our
         # purpose. We surface the number but do not treat non-zero as a
         # hard failure \u2014 it's normal for Chrome to exit with a code other
         # than 0 on some platforms even after a clean window close.
         print(
-            f"Chrome exited with code {completed.returncode}. "
-            "If you completed sign-ins before closing, the profile is still updated."
+            f"  Chrome exited with code {completed.returncode}. If you completed\n"
+            "  sign-ins before closing, the profile is still updated."
         )
+    print()
+    print("  Next: start the server with")
+    print("      remote-claws")
+    print("=" * 64)
     return 0
 
 
