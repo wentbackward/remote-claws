@@ -56,6 +56,17 @@ REMOTE_CLAWS_BROWSER_CHANNEL=chromium remote-claws
 
 The server will hard-fail at startup if `browser_channel=chrome` (the default) and Chrome isn't installed. This is intentional — the server is manually-run and non-daemon, so you find out at boot, not three tool-calls into a session.
 
+### Smoke-testing a running server
+
+`scripts/smoke_browser.py` connects to a running server over SSE and drives a short real-world browsing session (X.com posts, Bloomberg headlines, follow a story link). It saves a screenshot per step under `./smoke-screenshots/` so you can visually confirm that the persistent Chrome profile is signed in and that paywalls / bot walls aren't blocking you.
+
+```bash
+pip install "mcp[cli]>=1.20"
+export REMOTE_CLAWS_URL="http://<windows-ip>:8080/sse"
+export REMOTE_CLAWS_TOKEN="<bearer token>"
+python scripts/smoke_browser.py
+```
+
 ### Generate Auth Token
 
 The server requires authentication. No naked endpoints.
