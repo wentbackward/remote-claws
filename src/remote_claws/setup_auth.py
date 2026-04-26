@@ -16,17 +16,18 @@ def main() -> None:
 
     Re-running this is the supported way to seed the Chrome profile after
     the fact, so declining to overwrite an existing token must keep the
-    rest of the setup flow alive \u2014 not abort the whole script.
+    rest of the setup flow alive — not abort the whole script.
     """
     config = AppConfig()
     auth_path = Path(config.auth_file)
 
     if _generate_token(auth_path) is False:
-        # User declined to overwrite an existing token. That's fine \u2014 the
+        # User declined to overwrite an existing token. That's fine — the
         # token they already have still works; carry on to the next step.
         print(f"Keeping existing token in {auth_path.resolve()}.")
         print()
 
+    _configure_transport()
     _maybe_run_browser_setup()
 
 
@@ -42,7 +43,7 @@ def _generate_token(auth_path: Path) -> bool:
         if response not in {"y", "yes"}:
             return False
 
-    # Cryptographically random token (48 bytes \u2192 64-char base64url).
+    # Cryptographically random token (48 bytes → 64-char base64url).
     raw_bytes = secrets.token_bytes(48)
     token = urlsafe_b64encode(raw_bytes).decode().rstrip("=")
 
@@ -53,7 +54,7 @@ def _generate_token(auth_path: Path) -> bool:
 
     print()
     print("=" * 60)
-    print("  Remote Claws \u2014 Authentication Setup")
+    print("  Remote Claws — Authentication Setup")
     print("=" * 60)
     print()
     print("  Auth file written to:", auth_path.resolve())
@@ -68,6 +69,63 @@ def _generate_token(auth_path: Path) -> bool:
     print("=" * 60)
     print()
     return True
+
+
+def _configure_transport() -> None:
+    """Ask the user which MCP transport to use and persist the choice.
+
+    SSE is the legacy transport (Claude Desktop, openclaw, most existing
+    clients). Streamable HTTP is the MCP spec 2025-03-26+ transport
+    (Claude Code, newer SDKs).
+
+    If the config file already exists and contains a transport setting we
+    skip the prompt — the user already made a choice.
+    """
+    config_path = Path(AppConfig().config_file)
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                existing = json.load(f)
+            if "transport" in existing:
+                # Already configured — nothing to do.
+                return
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    if not sys.stdin.isatty():
+        # Non-interactive: default to SSE.
+        return
+
+    response = input(
+        "Which MCP transport should the server expose?\n"
+        "\n"
+        "  1) SSE (legacy) — works with Claude Desktop, openclaw,\n"
+        "     most existing clients. Default.\n"
+        "  2) Streamable HTTP — MCP spec 2025-03-26+. Works with\n"
+        "     Claude Code and newer SDKs.\n"
+        "\n"
+        "  [1] SSE  [2] Streamable HTTP  (default: 1)\n"
+    ).strip()
+
+    transport = "sse"
+    if response in {"2", "streamable-http", "streamable"}:
+        transport = "streamable-http"
+
+    # Merge into the existing config file (or create it).
+    config_data: dict = {}
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                config_data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    config_data["transport"] = transport
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=2)
+        f.write("\n")
+
+    print(f"\n  Transport set to: {transport}")
+    print(f"  Written to: {config_path.resolve()}")
 
 
 def _maybe_run_browser_setup() -> None:

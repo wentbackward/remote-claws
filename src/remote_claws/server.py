@@ -409,64 +409,42 @@ def main():
                     return
             await self.app(scope, receive, send)
 
-    # Mount both SSE and streamable-HTTP transports on the same uvicorn
-    # server. SSE (/sse) is the legacy/compatible transport. Streamable HTTP
-    # (/mcp) is the MCP spec 2025-03-26+ transport — stateless so our shared
-    # browser/process lifespan isn't split across sessions (there is only one
-    # operator, resources are shared, reconnect = reattach the same tab).
+    # Pick the transport — SSE (legacy, works with Claude Desktop, openclaw)
+    # or streamable-HTTP (MCP spec 2025-03-26+, works with Claude Code and
+    # newer SDKs). Only one at a time; the SDK's streamable-HTTP manager
+    # requires run() to be called first and we're not using that pattern.
     mcp.settings.host = config.host
     mcp.settings.port = config.port
-    # The SDK's streamable_http_app() creates a route at
-    # streamable_http_path (default "/mcp"). We mount that app at "/mcp" on
-    # the parent Starlette, so the SDK's internal path must be "/" —
-    # otherwise the full path becomes "/mcp/mcp" and clients get 404/307.
-    mcp.settings.streamable_http_path = "/"
-    sse_app = mcp.sse_app()
-    streamable_app = mcp.streamable_http_app()
 
-    # Shared middleware stack — applied to both transports identically.
-    # We build a parent Starlette app that mounts the two child apps so
-    # middleware can inspect the full request before dispatching to either.
-    from starlette.applications import Starlette
-    from starlette.routing import Mount
+    if config.transport == "streamable-http":
+        logger.info("Transport: streamable-HTTP (MCP spec 2025-03-26+)")
+        starlette_app = mcp.streamable_http_app()
+    else:
+        logger.info("Transport: SSE (legacy)")
+        starlette_app = mcp.sse_app()
 
     # Host header validation
     allowed_hosts = config.get_allowed_hosts()
     if allowed_hosts != ["*"]:
         from starlette.middleware.trustedhost import TrustedHostMiddleware
-        sse_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
-        streamable_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+        starlette_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
         logger.info("Trusted hosts: %s", ", ".join(allowed_hosts))
     else:
         logger.info("Host checking disabled (allowed_hosts='*')")
 
-    # Bearer token auth — wraps both transports
-    sse_app.add_middleware(BearerTokenMiddleware)
-    streamable_app.add_middleware(BearerTokenMiddleware)
+    # Bearer token auth
+    starlette_app.add_middleware(BearerTokenMiddleware)
 
     # IP allowlist — outermost layer (added last = runs first)
     allowed_ips = config.get_allowed_ips()
     if allowed_ips:
-        sse_app.add_middleware(IPAllowlistMiddleware, allowed_ips=allowed_ips)
-        streamable_app.add_middleware(IPAllowlistMiddleware, allowed_ips=allowed_ips)
+        starlette_app.add_middleware(IPAllowlistMiddleware, allowed_ips=allowed_ips)
         logger.info("IP allowlist enabled: %s", ", ".join(allowed_ips))
-
-    # Mount both under a single parent so uvicorn sees one app.
-    # /sse → SSE transport (legacy clients: Claude Desktop, openclaw)
-    # /mcp → streamable-HTTP transport (MCP spec 2025-03-26+ clients)
-    # The SDK's internal path is "/" (set above) so the mount point /mcp
-    # is the full external path — no double-mount, no 404.
-    parent_app = Starlette(
-        routes=[
-            Mount("/sse", app=sse_app),
-            Mount("/mcp", app=streamable_app, name="streamable"),
-        ],
-    )
 
     logger.info("Auth enabled — bearer token required for all connections")
 
     uvicorn_config = uvicorn.Config(
-        parent_app,
+        starlette_app,
         host=config.host,
         port=config.port,
         log_level="info",
