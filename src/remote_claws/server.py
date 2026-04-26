@@ -279,17 +279,30 @@ def main():
             token = auth_header[7:]
             result = await verifier.verify_token(token)
             if result is None:
-                # Diagnostic: prefix only (10 chars), plus length comparison.
+                # Diagnostic: prefix + suffix + a few telltales.
                 # remote-claws-setup mints 48 random bytes → 64-char base64url
-                # token, so any other length is a strong signal of a copy-paste
-                # accident (truncation, double 'Bearer ' prefix, trailing
-                # whitespace, etc.). Logging only the prefix preserves the
-                # remaining ~54 chars of entropy.
+                # token, so any other length signals a copy-paste accident:
+                # truncation, double 'Bearer ' prefix, JWT (has dots),
+                # trailing newline/whitespace, two tokens concatenated, etc.
+                # We only log a short prefix and suffix — the remaining ~34
+                # chars preserve enough entropy that this is not a meaningful
+                # disclosure to anyone with access to the server log.
                 EXPECTED_LEN = 64
-                preview = token[:10] if token else "(empty)"
+                head = token[:20] if token else "(empty)"
+                tail = token[-10:] if len(token) > 30 else ""
+                tells = []
+                if "." in token:
+                    tells.append("contains '.' (looks like a JWT)")
+                if "Bearer" in token:
+                    tells.append("contains the word 'Bearer' inside the token")
+                if any(c.isspace() for c in token):
+                    tells.append("contains whitespace/newline")
+                if len(token) == 2 * EXPECTED_LEN:
+                    tells.append("length is exactly 2x expected (pasted twice?)")
                 logger.warning(
-                    "Auth rejected: token did not match. prefix=%r length=%d expected=%d",
-                    preview, len(token), EXPECTED_LEN,
+                    "Auth rejected: token did not match. head=%r tail=%r length=%d expected=%d%s",
+                    head, tail, len(token), EXPECTED_LEN,
+                    (" [" + "; ".join(tells) + "]") if tells else "",
                 )
                 response = JSONResponse({"error": "Invalid bearer token"}, status_code=401)
                 await response(scope, receive, send)
