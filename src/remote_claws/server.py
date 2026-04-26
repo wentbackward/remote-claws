@@ -17,6 +17,68 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 logger = logging.getLogger(__name__)
 
 
+def _diagnose_auth_source(raw_auth_values: list[str]) -> None:
+    """Localise *which side* is duplicating the Authorization header.
+
+    raw_auth_values is the list pulled directly from scope['headers']; its
+    length tells us whether the wire actually carried multiple Authorization
+    headers (client emitted twice) or a single value already containing a
+    comma-joined pair (something upstream of us did the joining).
+
+    For each case we then check whether the two halves are bytewise
+    identical — if they are, the client knows exactly one token and is
+    just sending it twice; if they differ, there are genuinely two distinct
+    token sources somewhere in the client's config / env / proxy chain.
+    """
+    n = len(raw_auth_values)
+    if n == 0:
+        # Should not happen on the failing path (we got past the prefix check
+        # above), but guard anyway so the diagnostic is never the thing that
+        # crashes the request handler.
+        logger.warning("  source: no Authorization header captured (unexpected)")
+        return
+    if n == 1:
+        value = raw_auth_values[0]
+        # Strip the leading 'Bearer ' once to compare the two halves cleanly.
+        body = value[7:] if value.startswith("Bearer ") else value
+        # Did the client (or an intermediate) join two values with ', '?
+        if ", Bearer " in body:
+            halves = body.split(", Bearer ", 1)
+            same = halves[0] == halves[1]
+            logger.warning(
+                "  source: 1 Authorization header on the wire whose VALUE is comma-joined. "
+                "halves identical=%s. This means whatever built the header value "
+                "already concatenated two credentials — look in the client's config "
+                "templating / env-var expansion. (A wire-level duplicate would have "
+                "shown up as 2 separate headers.)",
+                same,
+            )
+        else:
+            logger.warning(
+                "  source: 1 Authorization header, single value, no embedded join. "
+                "Token simply doesn't match the server's hash — most likely the "
+                "client is using an old token (regenerate vs. what's in client config)."
+            )
+        return
+    # n >= 2: the client really sent the header more than once.
+    unique = set(raw_auth_values)
+    if len(unique) == 1:
+        logger.warning(
+            "  source: %d IDENTICAL Authorization headers on the wire. "
+            "This is an MCP/HTTP client bug — it is emitting the same Authorization "
+            "header from two code paths. Fix lives in the client (e.g. openclaw), "
+            "not in remote-claws.",
+            n,
+        )
+    else:
+        logger.warning(
+            "  source: %d DIFFERENT Authorization headers on the wire. "
+            "There really are two distinct credential sources in the client's setup "
+            "— grep its config dirs and env for both tokens to find them.",
+            n,
+        )
+
+
 @dataclass
 class AppContext:
     config: AppConfig
@@ -259,6 +321,22 @@ def main():
                 await self.app(scope, receive, send)
                 return
 
+            # Pull every Authorization header straight from the ASGI scope
+            # so we can tell the difference between
+            #   * one header sent twice on the wire (client bug — e.g. the
+            #     MCP client emits the header from two code paths) — the
+            #     ASGI spec preserves duplicates as separate entries.
+            #   * one header whose value already contains a comma-joined
+            #     pair (something upstream of us did the joining — a proxy,
+            #     or the client built the value that way itself).
+            # Starlette's Request.headers.get() collapses duplicates with
+            # ', ' which loses this signal, so we look at scope["headers"]
+            # directly.
+            raw_auth_values: list[str] = [
+                v.decode("latin-1")
+                for k, v in scope.get("headers", [])
+                if k.lower() == b"authorization"
+            ]
             request = Request(scope)
             auth_header = request.headers.get("authorization", "")
             if not auth_header.startswith("Bearer "):
@@ -304,6 +382,7 @@ def main():
                     head, tail, len(token), EXPECTED_LEN,
                     (" [" + "; ".join(tells) + "]") if tells else "",
                 )
+                _diagnose_auth_source(raw_auth_values)
                 response = JSONResponse({"error": "Invalid bearer token"}, status_code=401)
                 await response(scope, receive, send)
                 return
