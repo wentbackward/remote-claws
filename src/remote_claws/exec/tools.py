@@ -6,14 +6,21 @@ import uuid
 
 from mcp.server.fastmcp import FastMCP, Context
 
+from remote_claws.permissions import PermissionChecker
+
 
 def _get_ctx(ctx: Context):
     return ctx.request_context.lifespan_context
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
 
-    @mcp.tool()
+    def expose(fn):
+        if permissions.is_allowed(fn.__name__):
+            mcp.tool()(fn)
+        return fn
+
+    @expose
     async def exec_run(
         command: str,
         args: list[str] | None = None,
@@ -29,9 +36,6 @@ def register(mcp: FastMCP) -> None:
         timeout=0 means no timeout (run until completion or killed).
         """
         app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("exec_run"):
-            return json.dumps({"error": "Permission denied: exec_run"})
-
         process_id = uuid.uuid4().hex[:8]
         stdout_buf: list[str] = []
         stderr_buf: list[str] = []
@@ -89,7 +93,7 @@ def register(mcp: FastMCP) -> None:
             "status": "running",
         })
 
-    @mcp.tool()
+    @expose
     async def exec_get_output(
         process_id: str,
         wait: bool = False,
@@ -102,9 +106,6 @@ def register(mcp: FastMCP) -> None:
         Returns accumulated output so far.
         """
         app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("exec_get_output"):
-            return json.dumps({"error": "Permission denied: exec_get_output"})
-
         proc_info = app.processes.get(process_id)
         if not proc_info:
             return json.dumps({"error": f"No process found with id: {process_id}"})
@@ -128,13 +129,10 @@ def register(mcp: FastMCP) -> None:
             "stderr": "".join(proc_info["stderr"]),
         })
 
-    @mcp.tool()
+    @expose
     async def exec_send_input(process_id: str, input_text: str, ctx: Context = None) -> str:
         """Send input (stdin) to a running process. Appends a newline automatically."""
         app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("exec_send_input"):
-            return json.dumps({"error": "Permission denied: exec_send_input"})
-
         proc_info = app.processes.get(process_id)
         if not proc_info:
             return json.dumps({"error": f"No process found with id: {process_id}"})
@@ -147,13 +145,10 @@ def register(mcp: FastMCP) -> None:
         await proc.stdin.drain()
         return json.dumps({"status": "input sent", "process_id": process_id})
 
-    @mcp.tool()
+    @expose
     async def exec_kill(process_id: str, ctx: Context = None) -> str:
         """Kill a running process by its process_id."""
         app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("exec_kill"):
-            return json.dumps({"error": "Permission denied: exec_kill"})
-
         proc_info = app.processes.get(process_id)
         if not proc_info:
             return json.dumps({"error": f"No process found with id: {process_id}"})
@@ -166,13 +161,10 @@ def register(mcp: FastMCP) -> None:
         await proc.wait()
         return json.dumps({"status": "killed", "process_id": process_id, "exit_code": proc.returncode})
 
-    @mcp.tool()
+    @expose
     async def exec_list(ctx: Context = None) -> str:
         """List all tracked processes with their status."""
         app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("exec_list"):
-            return json.dumps({"error": "Permission denied: exec_list"})
-
         result = []
         for pid, info in app.processes.items():
             proc = info["process"]

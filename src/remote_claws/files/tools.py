@@ -1,31 +1,28 @@
 from __future__ import annotations
 
 import base64
-import glob as glob_mod
 import json
-import os
 import shutil
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Context
 
-
-def _get_ctx(ctx: Context):
-    return ctx.request_context.lifespan_context
+from remote_claws.permissions import PermissionChecker
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
 
-    @mcp.tool()
+    def expose(fn):
+        if permissions.is_allowed(fn.__name__):
+            mcp.tool()(fn)
+        return fn
+
+    @expose
     def file_write(path: str, content_base64: str, make_dirs: bool = True, ctx: Context = None) -> str:
         """
         Write binary content to a file. Content must be base64-encoded.
         Set make_dirs=True to create parent directories automatically.
         """
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_write"):
-            return json.dumps({"error": "Permission denied: file_write"})
-
         data = base64.b64decode(content_base64)
         p = Path(path)
         if make_dirs:
@@ -33,17 +30,13 @@ def register(mcp: FastMCP) -> None:
         p.write_bytes(data)
         return json.dumps({"status": "written", "path": str(p.resolve()), "bytes": len(data)})
 
-    @mcp.tool()
+    @expose
     def file_read(path: str, offset: int = 0, limit: int = 0, ctx: Context = None) -> str:
         """
         Read a file and return base64-encoded content.
         Use offset and limit (in bytes) for chunked reading of large files.
         limit=0 means read the entire file.
         """
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_read"):
-            return json.dumps({"error": "Permission denied: file_read"})
-
         p = Path(path)
         if not p.exists():
             return json.dumps({"error": f"File not found: {path}"})
@@ -65,16 +58,12 @@ def register(mcp: FastMCP) -> None:
             "content_base64": base64.b64encode(data).decode(),
         })
 
-    @mcp.tool()
+    @expose
     def file_list(path: str = ".", pattern: str = "*", recursive: bool = False, ctx: Context = None) -> str:
         """
         List files in a directory. Use pattern for glob matching (e.g. '*.txt').
         Set recursive=True to search subdirectories.
         """
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_list"):
-            return json.dumps({"error": "Permission denied: file_list"})
-
         p = Path(path)
         if not p.exists():
             return json.dumps({"error": f"Path not found: {path}"})
@@ -99,13 +88,9 @@ def register(mcp: FastMCP) -> None:
 
         return json.dumps(results, indent=2)
 
-    @mcp.tool()
+    @expose
     def file_delete(path: str, ctx: Context = None) -> str:
         """Delete a file or empty directory."""
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_delete"):
-            return json.dumps({"error": "Permission denied: file_delete"})
-
         p = Path(path)
         if not p.exists():
             return json.dumps({"error": f"Not found: {path}"})
@@ -116,13 +101,9 @@ def register(mcp: FastMCP) -> None:
             p.unlink()
         return json.dumps({"status": "deleted", "path": str(p.resolve())})
 
-    @mcp.tool()
+    @expose
     def file_move(src: str, dst: str, ctx: Context = None) -> str:
         """Move or rename a file or directory."""
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_move"):
-            return json.dumps({"error": "Permission denied: file_move"})
-
         src_p = Path(src)
         if not src_p.exists():
             return json.dumps({"error": f"Source not found: {src}"})
@@ -132,13 +113,9 @@ def register(mcp: FastMCP) -> None:
         shutil.move(str(src_p), str(dst_p))
         return json.dumps({"status": "moved", "src": str(src_p.resolve()), "dst": str(dst_p.resolve())})
 
-    @mcp.tool()
+    @expose
     def file_info(path: str, ctx: Context = None) -> str:
         """Get file/directory metadata: size, modified time, exists, is_dir."""
-        app = _get_ctx(ctx)
-        if not app.permissions.is_allowed("file_info"):
-            return json.dumps({"error": "Permission denied: file_info"})
-
         p = Path(path)
         if not p.exists():
             return json.dumps({"exists": False, "path": path})

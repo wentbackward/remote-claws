@@ -86,6 +86,23 @@ To rotate the token, run `remote-claws-setup` again.
 
 Use `"*"` to allow/deny an entire group. Omitting a group denies it entirely.
 
+Disallowed tools are not registered with the MCP server, so they don't show up in `tools/list` at all — the agent simply doesn't see them. There is no "permission denied" runtime error to chew through.
+
+### Disabling Whole Tool Groups at Startup
+
+For a stricter cut-off, set `enabled_groups` to skip a group entirely. Disabled groups are never imported, so heavy dependencies (Playwright for `browser`, pyautogui for `desktop`) stay out of memory:
+
+```bash
+REMOTE_CLAWS_ENABLED_GROUPS="exec,files" remote-claws
+```
+
+Or in `remote-claws.json`:
+```json
+{ "enabled_groups": "exec,files" }
+```
+
+A group is active only when it appears in `enabled_groups` **and** its `permissions.json` entry permits at least one tool. The `enabled_groups` filter is applied first, so a missing group can't be re-enabled by the policy file.
+
 ### IP Allowlist
 
 Lock the server to specific source IPs. Connections from any other IP are rejected with 403 before auth is even checked:
@@ -260,6 +277,7 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 | `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. `*` disables host checking. |
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
 | `REMOTE_CLAWS_PERMISSIONS_FILE` | `permissions.json` | Path to permission policy |
+| `REMOTE_CLAWS_ENABLED_GROUPS` | `browser,desktop,exec,files` | Tool groups loaded at startup. Groups not listed are not imported and expose no tools. |
 | `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chromium headless |
 | `REMOTE_CLAWS_BROWSER_CHANNEL` | `chromium` | Browser to use |
 | `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH` | `1280` | Max screenshot width |

@@ -28,6 +28,7 @@ Key settings:
 - `REMOTE_CLAWS_PORT`, `REMOTE_CLAWS_HOST`, `REMOTE_CLAWS_BROWSER_HEADLESS`, `REMOTE_CLAWS_BROWSER_CHANNEL`
 - `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`
 - `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
+- `REMOTE_CLAWS_ENABLED_GROUPS` (default: `browser,desktop,exec,files`): comma-separated list of tool groups to load at startup. Groups not listed are never imported (Playwright / pyautogui are not loaded), and none of their tools are registered. Use this to keep heavy dependencies out of memory on machines that don't need them.
 - `REMOTE_CLAWS_AUTH_FILE` (default: `.remote-claws-auth.json`)
 - `REMOTE_CLAWS_CONFIG_FILE` (default: `remote-claws.json`)
 
@@ -41,7 +42,7 @@ Bearer token auth via the MCP SDK's `TokenVerifier`. Run `remote-claws-setup` to
 
 **Tool registration**: Each module (`browser/tools.py`, `desktop/tools.py`, `exec/tools.py`, `files/tools.py`) exports a `register(mcp: FastMCP)` function that decorates handlers with `@mcp.tool()`. This avoids circular imports — `server.py` creates the `mcp` instance, then calls each `register()`.
 
-**Permission system** (`permissions.py`): Loads `permissions.json` at startup. Tool names map to groups via prefix (`browser_` → `browser`, `desktop_` → `desktop`, `exec_` → `exec`, `file_` → `files`). Deny always supersedes allow, default is deny-all. Every tool checks `app.permissions.is_allowed(tool_name)` inline before executing.
+**Permission system** (`permissions.py`): Loads `permissions.json` at startup. Tool names map to groups via prefix (`browser_` → `browser`, `desktop_` → `desktop`, `exec_` → `exec`, `file_` → `files`). Deny always supersedes allow, default is deny-all. The checker is consulted **at tool registration time**, not at call time — disallowed tools are never registered with FastMCP and therefore never appear in the MCP `tools/list` response. There is no runtime re-check inside tool bodies because the policy is fixed for the life of the process. `is_group_active(group)` combines the JSON policy with the `enabled_groups` config so the lifespan can skip importing a group's heavy deps (e.g. Playwright) when the group is fully off.
 
 **Browser lifecycle** (`browser/manager.py`): Lazy singleton — Playwright and Chromium only launch on first `get_page()` call. Uses `asyncio.Lock` to prevent double-launch. Maintains a list of `Page` objects with an active index for tab management.
 

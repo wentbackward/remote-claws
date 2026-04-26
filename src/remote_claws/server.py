@@ -11,7 +11,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from remote_claws.auth import HashedTokenVerifier, load_token_hash
 from remote_claws.config import AppConfig
-from remote_claws.browser.manager import BrowserManager
 from remote_claws.permissions import PermissionChecker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -21,20 +20,52 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppContext:
     config: AppConfig
-    browser: BrowserManager
+    # browser is None when the browser group is disabled at startup, in which
+    # case Playwright is never imported. Tools in disabled groups are not
+    # registered, so no tool will ever observe browser=None.
+    browser: object | None
     permissions: PermissionChecker
     processes: dict  # exec_run process tracker
 
 
+def _build_permissions() -> tuple[AppConfig, PermissionChecker]:
+    """Build the config + permission checker used by both registration and
+    the lifespan. Kept as a single function so module import and main() can't
+    drift."""
+    config = AppConfig()
+    permissions = PermissionChecker(
+        config.permissions_file,
+        enabled_groups=config.get_enabled_groups(),
+    )
+    return config, permissions
+
+
+# Build config + permissions at import time so we can decide which tool groups
+# to register before the MCP server starts answering tools/list requests.
+_CONFIG, _PERMISSIONS = _build_permissions()
+
+
 @asynccontextmanager
 async def app_lifespan(server: FastMCP):
-    config = AppConfig()
-    browser = BrowserManager(config)
-    permissions = PermissionChecker(config.permissions_file)
+    config = _CONFIG
+    permissions = _PERMISSIONS
     processes: dict = {}
+
+    browser = None
+    if permissions.is_group_active("browser"):
+        # Local import: avoid pulling Playwright into memory when the browser
+        # group is disabled.
+        from remote_claws.browser.manager import BrowserManager
+        browser = BrowserManager(config)
+
     logger.info("RemoteClaws starting up (host=%s, port=%s)", config.host, config.port)
     try:
-        yield AppContext(config=config, browser=browser, permissions=permissions, processes=processes)
+        yield AppContext(
+            config=config,
+            browser=browser,
+            permissions=permissions,
+            processes=processes,
+        )
     finally:
         # Kill tracked processes
         for proc_info in processes.values():
@@ -44,7 +75,8 @@ async def app_lifespan(server: FastMCP):
                     proc.kill()
                 except Exception:
                     pass
-        await browser.shutdown()
+        if browser is not None:
+            await browser.shutdown()
         logger.info("RemoteClaws shut down")
 
 
@@ -137,16 +169,31 @@ mcp = FastMCP(
     ),
 )
 
-# Register all tool groups
-from remote_claws.browser.tools import register as register_browser_tools
-from remote_claws.desktop.tools import register as register_desktop_tools
-from remote_claws.exec.tools import register as register_exec_tools
-from remote_claws.files.tools import register as register_file_tools
+# Register tool groups. A group is only imported when it is active — this
+# keeps Playwright / pyautogui out of memory on machines that don't need them.
+# Within an active group, only individually-permitted tools get registered, so
+# the MCP tools/list response reflects the policy exactly.
+if _PERMISSIONS.is_group_active("browser"):
+    from remote_claws.browser.tools import register as register_browser_tools
+    register_browser_tools(mcp, _PERMISSIONS)
 
-register_browser_tools(mcp)
-register_desktop_tools(mcp)
-register_exec_tools(mcp)
-register_file_tools(mcp)
+if _PERMISSIONS.is_group_active("desktop"):
+    from remote_claws.desktop.tools import register as register_desktop_tools
+    register_desktop_tools(mcp, _PERMISSIONS)
+
+if _PERMISSIONS.is_group_active("exec"):
+    from remote_claws.exec.tools import register as register_exec_tools
+    register_exec_tools(mcp, _PERMISSIONS)
+
+if _PERMISSIONS.is_group_active("files"):
+    from remote_claws.files.tools import register as register_file_tools
+    register_file_tools(mcp, _PERMISSIONS)
+
+logger.info(
+    "Active tool groups: %s",
+    ", ".join(g for g in ("browser", "desktop", "exec", "files")
+              if _PERMISSIONS.is_group_active(g)) or "(none)",
+)
 
 
 def main():
@@ -157,7 +204,7 @@ def main():
     from starlette.responses import JSONResponse
     from starlette.types import ASGIApp, Receive, Scope, Send
 
-    config = AppConfig()
+    config = _CONFIG
 
     # Load auth — refuse to start without it
     try:

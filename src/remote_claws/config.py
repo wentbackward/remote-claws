@@ -62,6 +62,11 @@ class AppConfig(BaseSettings):
     allowed_ips: str = ""  # comma-separated; empty = allow all (rely on token auth only)
     auth_file: str = ".remote-claws-auth.json"
     config_file: str = "remote-claws.json"  # optional JSON config overlay
+    # Comma-separated list of tool groups to enable at startup. A group that is
+    # not listed here is never imported and none of its tools are registered,
+    # regardless of permissions.json. Use this to keep heavy dependencies
+    # (Playwright, pyautogui) out of memory on machines that don't need them.
+    enabled_groups: str = "browser,desktop,exec,files"
 
     def __init__(self, **overrides):
         # Determine config file path: explicit override > env var > default
@@ -81,6 +86,13 @@ class AppConfig(BaseSettings):
         if not raw:
             return []
         return [ip.strip() for ip in raw.split(",") if ip.strip()]
+
+    def get_enabled_groups(self) -> list[str]:
+        """Parse enabled_groups into a list of group names."""
+        raw = self.enabled_groups.strip()
+        if not raw:
+            return []
+        return [g.strip() for g in raw.split(",") if g.strip()]
 
     def get_allowed_hosts(self) -> list[str]:
         """Parse allowed_hosts into a list. Returns ["*"] to disable checking."""
