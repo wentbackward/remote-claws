@@ -118,6 +118,7 @@ async def app_lifespan(server: FastMCP):
         # Local import: avoid pulling Playwright into memory when the browser
         # group is disabled.
         from remote_claws.browser.manager import BrowserManager, BrowserStartupError
+
         browser = BrowserManager(config)
         # Validate the browser environment before we start serving. The
         # server is purposefully manually-run and non-daemon, so a hard
@@ -143,10 +144,10 @@ async def app_lifespan(server: FastMCP):
         for proc_info in processes.values():
             proc = proc_info.get("process")
             if proc and proc.returncode is None:
-                try:
+                from contextlib import suppress
+
+                with suppress(Exception):
                     proc.kill()
-                except Exception:
-                    pass
         if browser is not None:
             await browser.shutdown()
         logger.info("RemoteClaws shut down")
@@ -247,24 +248,27 @@ mcp = FastMCP(
 # the MCP tools/list response reflects the policy exactly.
 if _PERMISSIONS.is_group_active("browser"):
     from remote_claws.browser.tools import register as register_browser_tools
+
     register_browser_tools(mcp, _PERMISSIONS)
 
 if _PERMISSIONS.is_group_active("desktop"):
     from remote_claws.desktop.tools import register as register_desktop_tools
+
     register_desktop_tools(mcp, _PERMISSIONS)
 
 if _PERMISSIONS.is_group_active("exec"):
     from remote_claws.exec.tools import register as register_exec_tools
+
     register_exec_tools(mcp, _PERMISSIONS)
 
 if _PERMISSIONS.is_group_active("files"):
     from remote_claws.files.tools import register as register_file_tools
+
     register_file_tools(mcp, _PERMISSIONS)
 
 logger.info(
     "Active tool groups: %s",
-    ", ".join(g for g in ("browser", "desktop", "exec", "files")
-              if _PERMISSIONS.is_group_active(g)) or "(none)",
+    ", ".join(g for g in ("browser", "desktop", "exec", "files") if _PERMISSIONS.is_group_active(g)) or "(none)",
 )
 
 
@@ -272,7 +276,6 @@ def main():
     import argparse
     import asyncio
     import uvicorn
-    from starlette.middleware import Middleware
     from starlette.requests import Request
     from starlette.responses import JSONResponse
     from starlette.types import ASGIApp, Receive, Scope, Send
@@ -333,9 +336,7 @@ def main():
             # ', ' which loses this signal, so we look at scope["headers"]
             # directly.
             raw_auth_values: list[str] = [
-                v.decode("latin-1")
-                for k, v in scope.get("headers", [])
-                if k.lower() == b"authorization"
+                v.decode("latin-1") for k, v in scope.get("headers", []) if k.lower() == b"authorization"
             ]
             request = Request(scope)
             auth_header = request.headers.get("authorization", "")
@@ -346,9 +347,9 @@ def main():
                 # something like 'Basic ...' or just the raw token).
                 preview = auth_header[:20] if auth_header else "(empty)"
                 logger.warning(
-                    "Auth rejected: header does not start with 'Bearer '. "
-                    "Got prefix=%r (length=%d)",
-                    preview, len(auth_header),
+                    "Auth rejected: header does not start with 'Bearer '. Got prefix=%r (length=%d)",
+                    preview,
+                    len(auth_header),
                 )
                 response = JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
                 await response(scope, receive, send)
@@ -379,7 +380,10 @@ def main():
                     tells.append("length is exactly 2x expected (pasted twice?)")
                 logger.warning(
                     "Auth rejected: token did not match. head=%r tail=%r length=%d expected=%d%s",
-                    head, tail, len(token), EXPECTED_LEN,
+                    head,
+                    tail,
+                    len(token),
+                    EXPECTED_LEN,
                     (" [" + "; ".join(tells) + "]") if tells else "",
                 )
                 _diagnose_auth_source(raw_auth_values)
@@ -427,6 +431,7 @@ def main():
     allowed_hosts = config.get_allowed_hosts()
     if allowed_hosts != ["*"]:
         from starlette.middleware.trustedhost import TrustedHostMiddleware
+
         starlette_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
         logger.info("Trusted hosts: %s", ", ".join(allowed_hosts))
     else:

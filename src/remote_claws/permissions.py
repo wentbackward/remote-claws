@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Iterable
+from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,7 @@ class PermissionChecker:
         self._permissions: dict[str, dict[str, list[str]]] = {}
         # None means "no startup-level group filter" (every group is enabled
         # subject to permissions). An explicit iterable narrows it.
-        self._enabled_groups: set[str] | None = (
-            None if enabled_groups is None else {g for g in enabled_groups}
-        )
+        self._enabled_groups: set[str] | None = None if enabled_groups is None else {g for g in enabled_groups}
         self._load(permissions_file)
 
     def _load(self, path: str) -> None:
@@ -103,6 +101,4 @@ class PermissionChecker:
 
         if tool_name in deny or "*" in deny:
             return False
-        if tool_name in allow or "*" in allow:
-            return True
-        return False
+        return bool(tool_name in allow or "*" in allow)

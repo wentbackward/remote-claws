@@ -75,23 +75,27 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
                     break
                 buf.append(line.decode(errors="replace"))
 
-        asyncio.create_task(_read_stream(proc.stdout, stdout_buf))
-        asyncio.create_task(_read_stream(proc.stderr, stderr_buf))
+        # Start background readers — store refs to prevent GC warnings.
+        _stdout_task = asyncio.create_task(_read_stream(proc.stdout, stdout_buf))  # noqa: RUF006
+        _stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_buf))  # noqa: RUF006
 
         # Auto-kill after timeout if set
         if timeout > 0:
+
             async def _auto_kill():
                 await asyncio.sleep(timeout)
                 if proc.returncode is None:
                     proc.kill()
 
-            asyncio.create_task(_auto_kill())
+            _kill_task = asyncio.create_task(_auto_kill())  # noqa: RUF006
 
-        return json.dumps({
-            "process_id": process_id,
-            "pid": proc.pid,
-            "status": "running",
-        })
+        return json.dumps(
+            {
+                "process_id": process_id,
+                "pid": proc.pid,
+                "status": "running",
+            }
+        )
 
     @expose
     async def exec_get_output(
@@ -113,21 +117,23 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         proc = proc_info["process"]
 
         if wait and proc.returncode is None:
-            try:
+            from contextlib import suppress
+
+            with suppress(TimeoutError):
                 await asyncio.wait_for(proc.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
-                pass
 
         # Small delay to let readers catch up
         await asyncio.sleep(0.1)
 
-        return json.dumps({
-            "process_id": process_id,
-            "running": proc.returncode is None,
-            "exit_code": proc.returncode,
-            "stdout": "".join(proc_info["stdout"]),
-            "stderr": "".join(proc_info["stderr"]),
-        })
+        return json.dumps(
+            {
+                "process_id": process_id,
+                "running": proc.returncode is None,
+                "exit_code": proc.returncode,
+                "stdout": "".join(proc_info["stdout"]),
+                "stderr": "".join(proc_info["stderr"]),
+            }
+        )
 
     @expose
     async def exec_send_input(process_id: str, input_text: str, ctx: Context = None) -> str:
@@ -168,12 +174,14 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         result = []
         for pid, info in app.processes.items():
             proc = info["process"]
-            result.append({
-                "process_id": pid,
-                "command": info["command"],
-                "args": info["args"],
-                "running": proc.returncode is None,
-                "exit_code": proc.returncode,
-                "pid": proc.pid,
-            })
+            result.append(
+                {
+                    "process_id": pid,
+                    "command": info["command"],
+                    "args": info["args"],
+                    "running": proc.returncode is None,
+                    "exit_code": proc.returncode,
+                    "pid": proc.pid,
+                }
+            )
         return json.dumps(result, indent=2)

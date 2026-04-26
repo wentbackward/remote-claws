@@ -3,12 +3,12 @@
 Kept free of Playwright and pyautogui imports so the auth-token setup CLI
 can import this without dragging the whole automation stack in.
 """
+
 from __future__ import annotations
 
 import os
 import platform
 import shutil
-import subprocess
 from pathlib import Path
 
 # Files Chrome creates in user_data_dir while it is running. Their presence
@@ -87,9 +87,9 @@ def find_chrome_executable() -> Path | None:
     candidates: list[Path] = []
     if system == "Windows":
         program_files = [
-            os.environ.get("ProgramFiles", r"C:\Program Files"),
-            os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-            os.environ.get("LocalAppData", str(Path.home() / "AppData" / "Local")),
+            os.environ.get("ProgramFiles", r"C:\Program Files"),  # noqa: SIM112
+            os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),  # noqa: SIM112
+            os.environ.get("LocalAppData", str(Path.home() / "AppData" / "Local")),  # noqa: SIM112
         ]
         for pf in program_files:
             candidates.append(Path(pf) / "Google" / "Chrome" / "Application" / "chrome.exe")
@@ -102,11 +102,13 @@ def find_chrome_executable() -> Path | None:
             found = shutil.which(name)
             if found:
                 return Path(found)
-        candidates.extend([
-            Path("/usr/bin/google-chrome"),
-            Path("/usr/bin/google-chrome-stable"),
-            Path("/opt/google/chrome/chrome"),
-        ])
+        candidates.extend(
+            [
+                Path("/usr/bin/google-chrome"),
+                Path("/usr/bin/google-chrome-stable"),
+                Path("/opt/google/chrome/chrome"),
+            ]
+        )
 
     for c in candidates:
         if c.is_file():

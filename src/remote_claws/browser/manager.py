@@ -53,16 +53,15 @@ class BrowserManager:
         this synchronously and eagerly so the operator finds out at boot,
         not on first tool call.
         """
-        if self._config.browser_channel == "chrome":
-            if find_chrome_executable() is None:
-                raise BrowserStartupError(
-                    "browser_channel='chrome' but Google Chrome was not found "
-                    "on this machine. Install Chrome from "
-                    "https://www.google.com/chrome/, or set "
-                    "REMOTE_CLAWS_BROWSER_CHANNEL=chromium to use the "
-                    "bundled Playwright build (test mode \u2014 will be flagged "
-                    "by anti-bot vendors)."
-                )
+        if self._config.browser_channel == "chrome" and find_chrome_executable() is None:
+            raise BrowserStartupError(
+                "browser_channel='chrome' but Google Chrome was not found "
+                "on this machine. Install Chrome from "
+                "https://www.google.com/chrome/, or set "
+                "REMOTE_CLAWS_BROWSER_CHANNEL=chromium to use the "
+                "bundled Playwright build (test mode \u2014 will be flagged "
+                "by anti-bot vendors)."
+            )
 
     # ----- public surface used by tools (unchanged) -------------------------
 
@@ -107,32 +106,30 @@ class BrowserManager:
     def list_tabs(self) -> list[dict]:
         result = []
         for i, page in enumerate(self._pages):
-            result.append({
-                "index": i,
-                "url": page.url,
-                "title": "",  # title requires await, filled by caller
-                "active": i == self._active_index,
-            })
+            result.append(
+                {
+                    "index": i,
+                    "url": page.url,
+                    "title": "",  # title requires await, filled by caller
+                    "active": i == self._active_index,
+                }
+            )
         return result
 
     async def shutdown(self) -> None:
+        from contextlib import suppress
+
         for page in self._pages:
             if not page.is_closed():
-                try:
+                with suppress(Exception):
                     await page.close()
-                except Exception:
-                    pass
         self._pages.clear()
         if self._context:
-            try:
+            with suppress(Exception):
                 await self._context.close()
-            except Exception:
-                pass
         if self._playwright:
-            try:
+            with suppress(Exception):
                 await self._playwright.stop()
-            except Exception:
-                pass
         logger.info("Browser manager shut down")
 
     # ----- internals --------------------------------------------------------
@@ -167,7 +164,7 @@ class BrowserManager:
         if self._stealth_apply is not None:
             try:
                 await self._stealth_apply(page)
-            except Exception as exc:  # noqa: BLE001 \u2014 stealth must never break a tool call
+            except Exception as exc:
                 logger.warning("Stealth application failed for new page: %s", exc)
         return page
 

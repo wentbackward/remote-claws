@@ -50,6 +50,7 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         Returns page title, final URL, and HTTP status.
         """
         import asyncio as _asyncio
+
         app = _get_ctx(ctx)
         page = await app.browser.get_page()
         response = await page.goto(url, wait_until=wait_until, timeout=timeout)
@@ -133,7 +134,7 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         else:
             raw = await page.screenshot(full_page=full_page)
         save_path = make_save_path(app.config.screenshot_dir) if save_to_disk else None
-        jpeg_bytes, saved = downscale_and_encode(
+        jpeg_bytes, _saved = downscale_and_encode(
             raw,
             max_width=app.config.screenshot_max_width,
             max_height=app.config.screenshot_max_height,
