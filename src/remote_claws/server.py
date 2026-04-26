@@ -262,6 +262,16 @@ def main():
             request = Request(scope)
             auth_header = request.headers.get("authorization", "")
             if not auth_header.startswith("Bearer "):
+                # Log a small prefix so the operator can see what the client
+                # actually sent (most common cause: the client config
+                # already includes 'Bearer ' so the wire value ends up as
+                # something like 'Basic ...' or just the raw token).
+                preview = auth_header[:20] if auth_header else "(empty)"
+                logger.warning(
+                    "Auth rejected: header does not start with 'Bearer '. "
+                    "Got prefix=%r (length=%d)",
+                    preview, len(auth_header),
+                )
                 response = JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
                 await response(scope, receive, send)
                 return
@@ -269,6 +279,18 @@ def main():
             token = auth_header[7:]
             result = await verifier.verify_token(token)
             if result is None:
+                # Diagnostic: prefix only (10 chars), plus length comparison.
+                # remote-claws-setup mints 48 random bytes → 64-char base64url
+                # token, so any other length is a strong signal of a copy-paste
+                # accident (truncation, double 'Bearer ' prefix, trailing
+                # whitespace, etc.). Logging only the prefix preserves the
+                # remaining ~54 chars of entropy.
+                EXPECTED_LEN = 64
+                preview = token[:10] if token else "(empty)"
+                logger.warning(
+                    "Auth rejected: token did not match. prefix=%r length=%d expected=%d",
+                    preview, len(token), EXPECTED_LEN,
+                )
                 response = JSONResponse({"error": "Invalid bearer token"}, status_code=401)
                 await response(scope, receive, send)
                 return
