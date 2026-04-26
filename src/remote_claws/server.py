@@ -449,11 +449,16 @@ def main():
     # Mount both under a single parent so uvicorn sees one app.
     # /sse → SSE transport (legacy clients: Claude Desktop, openclaw)
     # /mcp → streamable-HTTP transport (MCP spec 2025-03-26+ clients)
+    # redirect_slashes=True handles the common case where a client hits
+    # /mcp/ instead of /mcp — Starlette redirects 307 to the canonical
+    # path. Without this, the SDK's default path (/mcp) and any client
+    # that appends a trailing slash (very common) get a 404.
     parent_app = Starlette(
         routes=[
             Mount("/sse", app=sse_app),
-            Mount("/mcp", app=streamable_app),
+            Mount("/mcp", app=streamable_app, name="streamable"),
         ],
+        redirect_slashes=True,
     )
 
     logger.info("Auth enabled — bearer token required for all connections")
