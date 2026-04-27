@@ -1,7 +1,7 @@
 # Remote Claws
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
 [![GitHub](https://img.shields.io/github/stars/wentbackward/remote-claws?style=social)](https://github.com/wentbackward/remote-claws)
 
@@ -9,14 +9,14 @@ An MCP server that gives AI agents full control of a remote desktop machine — 
 
 ## What It Does
 
-Remote Claws exposes 39 tools over MCP (Model Context Protocol) via SSE/HTTP:
+Remote Claws exposes **39 tools** over MCP via HTTP:
 
 | Group | Tools | What It Controls |
 |-------|-------|-----------------|
-| **Browser** | 16 tools | Navigate, click, fill forms, read text, run JS, take page screenshots — via Playwright (Chromium) |
-| **Desktop** | 12 tools | Mouse clicks, keyboard input, window management, UI element inspection — via pyautogui + pywinauto |
-| **Exec** | 5 tools | Start processes, stream stdout/stderr, send stdin, kill — fully async |
-| **Files** | 6 tools | Read, write, list, move, delete files — base64 transfer with chunked reads |
+| **Browser** | 16 | Navigate, click, fill forms, read text, run JS, take screenshots — real Chrome with your identity |
+| **Desktop** | 12 | Mouse clicks, keyboard input, window management, UI element inspection — pyautogui + pywinauto |
+| **Exec** | 5 | Start processes, stream stdout/stderr, send stdin, kill — fully async |
+| **Files** | 6 | Read, write, list, move, delete — base64 transfer with chunked reads |
 
 See [TOOLS.md](TOOLS.md) for the complete tool reference and [SKILLS.md](SKILLS.md) for a high-level capability overview.
 
@@ -32,11 +32,17 @@ pip install -e .
 playwright install chromium  # bundled test build, used as a fallback
 ```
 
-### Browser Mode — Real Chrome with Your Identity
+### 1. Generate Auth Token
 
-The browser group defaults to **driving the system-installed Google Chrome with a dedicated persistent profile**, not the bundled Playwright Chromium. This is what lets the agent browse like you do: signed into your subscriptions, past the bot walls, with your adblocker, with your cookies. Bundled Chromium is still available as a channel for testing and internal sites where the test fingerprint is fine.
+```bash
+remote-claws-setup
+```
 
-Install Chrome from <https://www.google.com/chrome/> if you don't already have it. Then seed the profile:
+This prints a bearer token **once** — copy it now. Only the SHA-256 hash is stored on disk. The setup script also:
+- Prompts for transport choice (SSE or Streamable HTTP)
+- Offers to chain into `remote-claws-browser-setup`
+
+### 2. Seed the Browser Profile (Optional but Recommended)
 
 ```bash
 remote-claws-browser-setup
@@ -44,52 +50,23 @@ remote-claws-browser-setup
 remote-claws-browser-setup --url https://nytimes.com
 ```
 
-Chrome opens on a dedicated profile (under `%LOCALAPPDATA%\RemoteClaws\chrome-profile` on Windows, `~/.local/share/remote-claws/chrome-profile` on Linux, `~/Library/Application Support/RemoteClaws/chrome-profile` on macOS). Sign into the services you want the agent to access, install your adblocker, accept cookie banners, then close the window. Sessions persist across server restarts. Run it again any time to add more services.
+Chrome opens on a **dedicated profile** (separate from your daily Chrome) under `%LOCALAPPDATA%\RemoteClaws\chrome-profile` on Windows, `~/.local/share/remote-claws/chrome-profile` on Linux, `~/Library/Application Support/RemoteClaws/chrome-profile` on macOS. Sign into the services you want the agent to access, install your adblocker, accept cookie banners, then close the window. Sessions persist across server restarts.
 
-The profile is **deliberately separate from your normal Chrome profile**. You opt services in by signing into them inside the dedicated profile — no risk of the agent finding your bank session because it shares your daily Chrome.
-
-To fall back to the bundled test Chromium (e.g. CI, internal testing, sites where stealth Chrome causes friction):
+The browser group defaults to **driving system-installed Google Chrome** with this persistent profile — not the bundled Playwright Chromium. This is what lets the agent browse like you do: signed into subscriptions, past bot walls, with your adblocker. To fall back to bundled Chromium (e.g. CI, internal testing):
 
 ```bash
 REMOTE_CLAWS_BROWSER_CHANNEL=chromium remote-claws
 ```
 
-The server will hard-fail at startup if `browser_channel=chrome` (the default) and Chrome isn't installed. This is intentional — the server is manually-run and non-daemon, so you find out at boot, not three tool-calls into a session.
+The server hard-fails at startup if `browser_channel=chrome` (the default) and Chrome isn't installed.
 
-### Smoke-testing a running server
-
-`scripts/smoke_browser.py` connects to a running server over SSE and drives a short real-world browsing session (X.com posts, Bloomberg headlines, follow a story link). It saves a screenshot per step under `./smoke-screenshots/` so you can visually confirm that the persistent Chrome profile is signed in and that paywalls / bot walls aren't blocking you.
+### 3. Start the Server
 
 ```bash
-pip install "mcp[cli]>=1.20"
-export REMOTE_CLAWS_URL="http://<windows-ip>:8080/sse"
-export REMOTE_CLAWS_TOKEN="<bearer token>"
-python scripts/smoke_browser.py
-```
-
-### Generate Auth Token
-
-The server requires authentication. No naked endpoints.
-
-```bash
-remote-claws-setup
-```
-
-This prints a bearer token **once** — copy it now. Only the SHA-256 hash is stored on disk in `.remote-claws-auth.json`. The raw token never touches disk. The setup script also offers to chain into `remote-claws-browser-setup` so you can seed the profile in one go.
-
-### Start the Server
-
-The server runs in the **foreground** — keep the terminal open while agents are connected. There is no background/service mode yet; this keeps things simple and visible while the project stabilizes.
-
-```bash
-# Activate the venv first (every new terminal session)
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/macOS
-
 remote-claws
 ```
 
-The server starts on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/sse` with the bearer token. You'll see tool calls logged in the terminal as agents use them.
+The server runs in the **foreground** on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/sse` (SSE) or `http://<your-ip>:8080/mcp` (Streamable HTTP) with the bearer token.
 
 ## Security
 
@@ -121,11 +98,11 @@ To rotate the token, run `remote-claws-setup` again.
 
 Use `"*"` to allow/deny an entire group. Omitting a group denies it entirely.
 
-Disallowed tools are not registered with the MCP server, so they don't show up in `tools/list` at all — the agent simply doesn't see them. There is no "permission denied" runtime error to chew through.
+Disallowed tools are not registered with the MCP server, so they don't show up in `tools/list` at all — the agent simply doesn't see them. There is no "permission denied" runtime error.
 
 ### Disabling Whole Tool Groups at Startup
 
-For a stricter cut-off, set `enabled_groups` to skip a group entirely. Disabled groups are never imported, so heavy dependencies (Playwright for `browser`, pyautogui for `desktop`) stay out of memory:
+Set `enabled_groups` to skip a group entirely. Disabled groups are never imported, so heavy dependencies (Playwright for `browser`, pyautogui for `desktop`) stay out of memory:
 
 ```bash
 REMOTE_CLAWS_ENABLED_GROUPS="exec,files" remote-claws
@@ -136,7 +113,7 @@ Or in `remote-claws.json`:
 { "enabled_groups": "exec,files" }
 ```
 
-A group is active only when it appears in `enabled_groups` **and** its `permissions.json` entry permits at least one tool. The `enabled_groups` filter is applied first, so a missing group can't be re-enabled by the policy file.
+A group is active only when it appears in `enabled_groups` **and** its `permissions.json` entry permits at least one tool.
 
 ### IP Allowlist
 
@@ -167,6 +144,15 @@ For production, also consider:
 - Put behind a reverse proxy with TLS for encryption in transit
 
 ## Connecting Agents
+
+Remote Claws supports **two transport protocols**. Both are available on the same port:
+
+| Transport | Path | Clients |
+|-----------|------|---------|
+| **SSE** (legacy) | `/sse` | Claude Desktop, openclaw, most existing clients |
+| **Streamable HTTP** (MCP spec 2025-03-26+) | `/mcp` | Claude Code, newer SDKs |
+
+Choose one at setup time (`remote-claws-setup` prompts). Both share the same browser tab and process tracker — reconnecting clients reattach the same session.
 
 ### Claude Desktop
 
@@ -269,10 +255,11 @@ For a detailed walkthrough including skill installation and troubleshooting, see
 
 ### Any MCP Client
 
-Remote Claws works with any MCP-compliant client. Connect to the SSE endpoint and pass the bearer token:
+Remote Claws works with any MCP-compliant client. Connect to either transport:
 
 ```
-URL:    http://YOUR_IP:8080/sse
+SSE:    http://YOUR_IP:8080/sse
+Streamable HTTP: http://YOUR_IP:8080/mcp
 Header: Authorization: Bearer YOUR_TOKEN_HERE
 ```
 
@@ -308,6 +295,7 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 |----------|---------|-------------|
 | `REMOTE_CLAWS_HOST` | `0.0.0.0` | Bind address |
 | `REMOTE_CLAWS_PORT` | `8080` | Listen port |
+| `REMOTE_CLAWS_TRANSPORT` | `sse` | MCP transport: `sse` or `streamable-http` |
 | `REMOTE_CLAWS_ALLOWED_IPS` | *(empty)* | Comma-separated source IPs allowed to connect. Empty = no IP filtering (rely on token auth). Checked before auth. |
 | `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. `*` disables host checking. |
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
@@ -317,10 +305,8 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 | `REMOTE_CLAWS_BROWSER_PROFILE_DIR` | OS default | Override the Chrome user-data directory. Empty = OS-appropriate default. |
 | `REMOTE_CLAWS_BROWSER_STEALTH` | `true` | Apply tf-playwright-stealth patches to every page. Disable only if a site misbehaves under them. |
 | `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chrome headless. Strongly discouraged when `browser_channel=chrome` — anti-bot vendors fingerprint headless rendering. |
-| `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chromium headless |
-| `REMOTE_CLAWS_BROWSER_CHANNEL` | `chromium` | Browser to use |
 | `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH` | `1280` | Max screenshot width |
-| `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT` | `960` | Max screenshot height |
+| `REMOTE_CLAWS_SCREENSHOT_HEIGHT` | `960` | Max screenshot height |
 | `REMOTE_CLAWS_SCREENSHOT_QUALITY` | `75` | JPEG quality (1-100) |
 | `REMOTE_CLAWS_SCREENSHOT_DIR` | *(empty)* | Directory to save screenshots (when `save_to_disk=true`) |
 | `REMOTE_CLAWS_CONFIG_FILE` | `remote-claws.json` | Path to the JSON config file |
@@ -344,6 +330,17 @@ REMOTE_CLAWS_ALLOWED_HOSTS="*" remote-claws
 Or set it in `remote-claws.json`:
 ```json
 { "allowed_hosts": "localhost,127.0.0.1,100.82.48.9" }
+```
+
+## Smoke Testing
+
+`scripts/smoke_browser.py` connects to a running server over SSE and drives a short real-world browsing session (X.com posts, Bloomberg headlines, follow a story link). It saves a screenshot per step under `./smoke-screenshots/` so you can visually confirm that the persistent Chrome profile is signed in and that paywalls / bot walls aren't blocking you.
+
+```bash
+pip install "mcp[cli]>=1.20"
+export REMOTE_CLAWS_URL="http://<windows-ip>:8080/sse"
+export REMOTE_CLAWS_TOKEN="<bearer token>"
+python scripts/smoke_browser.py
 ```
 
 ## How It Works
