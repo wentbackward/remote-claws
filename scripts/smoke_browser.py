@@ -132,20 +132,20 @@ class Driver:
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
         self._shot_counter = 0
 
-    async def call(self, tool: str, **arguments: Any) -> Any:
-        """Call a tool, surface errors as warnings, return the raw result."""
+    async def call(self, action: str, **arguments: Any) -> Any:
+        """Call a remote_browser action, surface errors as warnings, return the raw result."""
         try:
-            result = await self.session.call_tool(tool, arguments)
-        except Exception as exc:  # noqa: BLE001 \u2014 we want to keep going
-            fail(f"{tool} raised {type(exc).__name__}: {exc}")
+            result = await self.session.call_tool("remote_browser", {"action": action, **arguments})
+        except Exception as exc:  # noqa: BLE001 — we want to keep going
+            fail(f"{action} raised {type(exc).__name__}: {exc}")
             return None
         if is_error(result):
-            fail(f"{tool} returned error: {text_of(result)[:200]}")
+            fail(f"{action} returned error: {text_of(result)[:200]}")
         return result
 
     async def screenshot(self, label: str) -> Path | None:
         """Capture a screenshot and save it under a numbered, labelled file."""
-        result = await self.call("browser_screenshot")
+        result = await self.call("screenshot")
         if result is None:
             return None
         data = image_bytes_of(result)
@@ -163,16 +163,15 @@ class Driver:
 # Scripted flow
 # ---------------------------------------------------------------------------
 async def run_smoke(driver: Driver) -> None:
-    # ---- 0. sanity: list tools so we can confirm browser_* are registered
+    # ---- 0. sanity: list tools so we can confirm the browser tool is registered
     step(0, "List tools to confirm browser group is active")
     tools = await driver.session.list_tools()
     names = sorted(t.name for t in tools.tools)
-    browser_names = [n for n in names if n.startswith("browser_")]
-    print(f"    {len(names)} tools total, {len(browser_names)} in browser group")
-    if not browser_names:
-        fail("no browser_* tools visible \u2014 is the browser group enabled and permitted?")
+    print(f"    {len(names)} tools total: {', '.join(names)}")
+    if "remote_browser" not in names:
+        fail("remote_browser not visible \u2014 is the browser group enabled and permitted?")
         return
-    ok(f"browser tools: {', '.join(browser_names[:5])}{' ...' if len(browser_names) > 5 else ''}")
+    ok("remote_browser is registered")
 
     # ---- 1. x.com
     step(1, "Open https://x.com/home and pull visible posts")
@@ -181,7 +180,7 @@ async def run_smoke(driver: Driver) -> None:
     # + a settle pause give X's SPA time to hydrate the feed before we
     # scrape — domcontentloaded fires far too early for a JS-driven app.
     nav = await driver.call(
-        "browser_navigate",
+        "navigate",
         url="https://x.com/home",
         wait_until="load",
         settle_ms=4000,
@@ -191,14 +190,14 @@ async def run_smoke(driver: Driver) -> None:
     # Wait for either a tweet article (signed in) or the sign-in form
     # (signed out) so the script can report which it saw.
     await driver.call(
-        "browser_wait_for",
+        "wait_for",
         selector='article, [data-testid="loginButton"]',
         state="visible",
         timeout=20000,
     )
 
     posts = await driver.call(
-        "browser_eval_js",
+        "eval_js",
         expression=textwrap.dedent("""
             (() => {
                 const articles = Array.from(document.querySelectorAll('article'));
@@ -233,7 +232,7 @@ async def run_smoke(driver: Driver) -> None:
     # challenge time to clear before we scrape, otherwise we'd get the
     # interstitial HTML (title 'Are you a robot?', status 403).
     nav = await driver.call(
-        "browser_navigate",
+        "navigate",
         url="https://www.bloomberg.com",
         wait_until="load",
         settle_ms=6000,
@@ -253,7 +252,7 @@ async def run_smoke(driver: Driver) -> None:
     # whose href looks like an article URL. Returns up to 8 headline+href
     # pairs and the chosen target link.
     scrape = await driver.call(
-        "browser_eval_js",
+        "eval_js",
         expression=textwrap.dedent("""
             (() => {
                 const seen = new Set();
@@ -296,7 +295,7 @@ async def run_smoke(driver: Driver) -> None:
         return
     print(f"    target: {target_url}")
     nav = await driver.call(
-        "browser_navigate",
+        "navigate",
         url=target_url,
         wait_until="load",
         settle_ms=3000,
@@ -306,7 +305,7 @@ async def run_smoke(driver: Driver) -> None:
     # Pull a chunk of the article body so the operator can see what we got
     # (paywalled or not \u2014 the navigation itself is what we're verifying).
     body = await driver.call(
-        "browser_eval_js",
+        "eval_js",
         expression=textwrap.dedent("""
             (() => {
                 const root = document.querySelector('article') || document.body;
