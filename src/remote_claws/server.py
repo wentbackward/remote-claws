@@ -338,6 +338,10 @@ def main():
                 if k.lower() == b"authorization"
             ]
             request = Request(scope)
+            client = scope.get("client")
+            client_ip = client[0] if client else "unknown"
+            path = scope.get("path", "?")
+            method = scope.get("method", "?")
             auth_header = request.headers.get("authorization", "")
             if not auth_header.startswith("Bearer "):
                 # Log a small prefix so the operator can see what the client
@@ -346,8 +350,9 @@ def main():
                 # something like 'Basic ...' or just the raw token).
                 preview = auth_header[:20] if auth_header else "(empty)"
                 logger.warning(
-                    "Auth rejected: header does not start with 'Bearer '. "
-                    "Got prefix=%r (length=%d)",
+                    "AUTH FAILURE — ip=%s method=%s path=%s — "
+                    "header does not start with 'Bearer '. Got prefix=%r (length=%d)",
+                    client_ip, method, path,
                     preview, len(auth_header),
                 )
                 response = JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
@@ -378,7 +383,9 @@ def main():
                 if len(token) == 2 * EXPECTED_LEN:
                     tells.append("length is exactly 2x expected (pasted twice?)")
                 logger.warning(
-                    "Auth rejected: token did not match. head=%r tail=%r length=%d expected=%d%s",
+                    "AUTH FAILURE — ip=%s method=%s path=%s — "
+                    "token did not match. head=%r tail=%r length=%d expected=%d%s",
+                    client_ip, method, path,
                     head, tail, len(token), EXPECTED_LEN,
                     (" [" + "; ".join(tells) + "]") if tells else "",
                 )

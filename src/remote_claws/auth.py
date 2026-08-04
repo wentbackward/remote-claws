@@ -45,5 +45,4 @@ class HashedTokenVerifier:
                 client_id="remote-agent",
                 scopes=["*"],
             )
-        logger.warning("Rejected connection: invalid bearer token")
         return None
