@@ -21,6 +21,7 @@ from remote_claws.browser.profile import (
     find_chrome_executable,
     is_profile_locked,
     resolve_profile_dir,
+    write_channel_stamp,
 )
 from remote_claws.config import AppConfig
 
@@ -54,6 +55,12 @@ def run_browser_setup(url: str | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+
+    # This CLI launches real Chrome directly, so it owns the profile as
+    # channel 'chrome'. Stamping that here lets the server fail fast at
+    # startup if it is later configured with channel=chromium (bundled
+    # Playwright build) — mixing builds on one profile crashes the browser.
+    write_channel_stamp(profile_dir, "chrome")
 
     print()
     print("=" * 64)

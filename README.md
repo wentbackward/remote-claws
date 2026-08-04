@@ -14,7 +14,7 @@ Remote Claws exposes **4 tools (39 actions)** over MCP via HTTP. Each tool takes
 | Tool | Actions | What It Controls |
 |------|---------|-----------------|
 | **remote_browser** | 16 | Navigate, click, fill forms, read text, run JS, take screenshots — real Chrome with your identity |
-| **remote_desktop** | 12 | Mouse clicks, keyboard input, window management, UI element inspection — pyautogui + pywinauto |
+| **remote_desktop** | 12 | Mouse clicks, keyboard input, screenshots, window management — pyautogui (cross-platform) + pywinauto (Windows-only element inspection) |
 | **remote_exec** | 5 | Start processes, stream stdout/stderr, send stdin, kill — fully async |
 | **remote_files** | 6 | Read, write, list, move, delete — base64 transfer with chunked reads |
 
@@ -347,7 +347,7 @@ Or set it in `remote-claws.json`:
 
 ```bash
 pip install "mcp[cli]>=1.20"
-export REMOTE_CLAWS_URL="http://<windows-ip>:8080/mcp"
+export REMOTE_CLAWS_URL="http://<remote-host>:8080/mcp"
 export REMOTE_CLAWS_TOKEN="<bearer token>"
 python scripts/smoke_browser.py
 ```

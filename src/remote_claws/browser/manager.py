@@ -11,7 +11,12 @@ from playwright.async_api import (
     async_playwright,
 )
 
-from remote_claws.browser.profile import find_chrome_executable, resolve_profile_dir
+from remote_claws.browser.profile import (
+    find_chrome_executable,
+    read_channel_stamp,
+    resolve_profile_dir,
+    write_channel_stamp,
+)
 from remote_claws.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -52,8 +57,26 @@ class BrowserManager:
         configured channel is 'chrome' but Chrome is not installed. We do
         this synchronously and eagerly so the operator finds out at boot,
         not on first tool call.
+
+        Also fails fast on a channel/profile mismatch: the setup CLI seeds
+        the profile with REAL Chrome, and launching Playwright's bundled
+        Chromium (channel=chromium) against that Chrome-stamped profile
+        crashes the browser on startup. Better to refuse at boot with a
+        clear remedy than to hand the agent a crashing browser.
         """
-        if self._config.browser_channel == "chrome" and find_chrome_executable() is None:
+        channel = self._config.browser_channel
+        stamp = read_channel_stamp(self._profile_dir)
+        if stamp is not None and stamp != channel:
+            raise BrowserStartupError(
+                f"browser_channel={channel!r} but the profile at "
+                f"{self._profile_dir} was created by channel {stamp!r}. "
+                "Mixing browser builds on one profile crashes the browser "
+                "on startup. Either set REMOTE_CLAWS_BROWSER_CHANNEL to "
+                f"{stamp!r}, point REMOTE_CLAWS_BROWSER_PROFILE_DIR at a "
+                "fresh directory, or delete the .remote-claws-channel file "
+                "in the profile directory to re-stamp it."
+            )
+        if channel == "chrome" and find_chrome_executable() is None:
             raise BrowserStartupError(
                 "browser_channel='chrome' but Google Chrome was not found "
                 "on this machine. Install Chrome from "
@@ -150,6 +173,11 @@ class BrowserManager:
             if self._config.browser_channel and self._config.browser_channel != "chromium":
                 launch_kwargs["channel"] = self._config.browser_channel
             self._context = await self._playwright.chromium.launch_persistent_context(**launch_kwargs)
+            # Stamp the profile with the channel that owns it so a later
+            # channel change fails preflight instead of crashing the browser.
+            # Profiles created before this mechanism get stamped on their
+            # first successful launch.
+            write_channel_stamp(self._profile_dir, self._config.browser_channel)
             logger.info(
                 "Browser context launched (channel=%s, profile=%s, headless=%s, stealth=%s)",
                 self._config.browser_channel,

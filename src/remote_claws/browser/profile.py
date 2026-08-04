@@ -6,10 +6,13 @@ can import this without dragging the whole automation stack in.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import shutil
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Files Chrome creates in user_data_dir while it is running. Their presence
 # is a strong (not perfect) signal that another Chrome instance owns the
@@ -17,6 +20,34 @@ from pathlib import Path
 # hostname-pid; on Windows there is no symlink, only the lock files.
 _UNIX_LOCK_NAME = "SingletonLock"
 _WIN_LOCK_NAME = "lockfile"
+
+# Marker file recording which browser channel created/owns the profile.
+# remote-claws-browser-setup launches REAL Chrome directly; the server can be
+# configured to launch Playwright's BUNDLED Chromium instead. Mixing two
+# different browser builds on one user-data-dir makes the browser crash on
+# startup, so we stamp the profile and fail fast on a channel mismatch.
+_CHANNEL_STAMP_NAME = ".remote-claws-channel"
+
+
+def read_channel_stamp(profile_dir: Path) -> str | None:
+    """Return the channel that owns this profile ('chrome', 'chromium', ...),
+    or None if the profile has never been stamped (e.g. created before this
+    mechanism existed)."""
+    stamp = profile_dir / _CHANNEL_STAMP_NAME
+    try:
+        value = stamp.read_text().strip()
+    except OSError:
+        return None
+    return value or None
+
+
+def write_channel_stamp(profile_dir: Path, channel: str) -> None:
+    """Record that `channel` owns this profile. Best-effort: a profile that
+    cannot be stamped (read-only fs) must not block browser startup."""
+    try:
+        (profile_dir / _CHANNEL_STAMP_NAME).write_text(channel + "\n")
+    except OSError:
+        logger.warning("Could not write channel stamp to %s", profile_dir)
 
 
 def default_profile_dir() -> Path:

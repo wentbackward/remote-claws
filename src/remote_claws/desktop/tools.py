@@ -247,7 +247,8 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
           type_text text=<text> [interval=0.02]   ASCII only.
           press_key keys=<combo>                  "enter", "ctrl+c", "alt+tab", "win"
 
-        Windows UI automation (targets controls by NAME — resolution-independent)
+        Windows UI automation (targets controls by NAME — resolution-independent).
+        These four actions are Windows-only; on macOS use screenshot + coordinates.
           find_window [title=<substr>] [class_name=<substr>]
               List visible windows with title, class, rectangle.
           focus_window title=<substr>             Bring matching window to foreground.
