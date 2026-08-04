@@ -154,79 +154,51 @@ async def app_lifespan(server: FastMCP):
 
 
 SERVER_INSTRUCTIONS = """\
-You are controlling a remote machine with a graphical desktop. You have four \
-tool groups: browser, desktop, exec, and files. Some tools may be disabled by \
-the server's permission policy — if a tool returns "Permission denied", do not \
-retry it.
+You are controlling a REMOTE machine with a graphical desktop through four \
+tools: remote_browser, remote_desktop, remote_exec, remote_files.
+
+CRITICAL: these tools act on the REMOTE machine running this server — not on \
+your local environment. If you also have similarly-named local tools (browser, \
+exec, read, write, ...), they are DIFFERENT tools on a DIFFERENT machine. Use \
+remote_* for anything on the remote machine.
+
+Each remote_* tool takes an `action` parameter plus params, like a CLI \
+subcommand: remote_browser(action="navigate", url="https://..."). Read each \
+tool's description for its action list. An unknown action returns the list of \
+valid ones.
+
+Some actions may be denied by server policy — a denied action returns \
+"permission denied"; do not retry it.
 
 ## Orientation
 
-Always orient yourself before acting. Take a desktop_screenshot or \
-browser_screenshot to see the current state. Use coordinates from the screenshot \
-to target clicks. Screenshots are JPEG, max 1280x960.
+Always orient yourself before acting: remote_desktop(action="screenshot") or \
+remote_browser(action="screenshot") to see the current state. Screenshots are \
+JPEG, max 1280x960.
 
-## Choosing the Right Tool Group
+## Choosing the Right Tool
 
-- **Web tasks**: Prefer browser_* tools. They use CSS selectors and are far more \
-reliable than pixel-based desktop clicks. Use browser_navigate to open a URL, \
-browser_click/fill/type to interact, browser_get_text to read content.
-- **Native app tasks**: Use desktop_* tools. Take a desktop_screenshot to see the \
-screen, then use desktop_mouse_click with coordinates. For Windows-specific UI, \
-use desktop_find_window, desktop_list_elements, and desktop_click_element to \
-target elements by name rather than coordinates.
-- **Shell commands**: Use exec_run to start a process. It returns a process_id \
-immediately. Poll with exec_get_output (wait=false for non-blocking, wait=true \
-to block until done). For interactive programs, use exec_send_input to write to \
-stdin. Always exec_list or exec_get_output to check on running processes.
-- **File operations**: Use file_* tools. Content is base64-encoded. For large \
-files, use file_read with offset/limit to read in chunks.
-
-## Browser Workflow
-
-1. browser_navigate to load the page
-2. browser_get_text (selector="body") to read visible content
-3. browser_screenshot if you need to see layout
-4. browser_click / browser_fill / browser_type to interact
-5. browser_wait_for if you need to wait for dynamic content
-6. browser_eval_js for anything the other tools can't do
-
-The browser is stateful — one active tab persists across calls. Use \
-browser_tab_new / browser_tabs_list / browser_tab_close for multi-tab work.
-
-## Desktop Workflow
-
-1. desktop_screenshot to see the current screen
-2. desktop_find_window to locate the target app
-3. desktop_focus_window to bring it to front
-4. desktop_screenshot again to see the focused app
-5. desktop_mouse_click at the target coordinates OR desktop_click_element by name
-6. desktop_type_text or desktop_press_key for keyboard input
-
-For precision, use desktop_list_elements to enumerate UI controls by name and \
-type, then desktop_click_element to click by name — this is more reliable than \
-coordinate-based clicking.
-
-## Exec Workflow
-
-1. exec_run to start a command (returns process_id)
-2. exec_get_output with wait=false to check progress, or wait=true to block
-3. exec_send_input if the process needs stdin
-4. exec_kill to terminate if stuck
-5. exec_list to see all tracked processes
-
-Set shell=true for commands with pipes, redirects, or shell builtins. Set \
-timeout (seconds) to auto-kill long-running processes.
+- **Web tasks**: remote_browser. CSS selectors — reliable and \
+resolution-independent. navigate → get_text → click/fill/type → screenshot \
+to verify.
+- **Native app tasks**: remote_desktop. screenshot → find_window → \
+focus_window → click_element by name (more reliable than coordinates) or \
+mouse_click at coordinates from the screenshot.
+- **Shell commands**: remote_exec. run returns a process_id immediately; \
+get_output (wait=true to block) reads output; send_input writes stdin; kill \
+when done.
+- **Files**: remote_files. Content is base64. Chunk large reads with \
+offset/limit.
 
 ## Important Notes
 
-- Desktop coordinates are absolute screen pixels. After any window move/resize, \
-re-screenshot before clicking.
-- pyautogui failsafe is enabled: if the mouse is moved to (0,0), operations abort.
-- browser_fill clears existing content before typing. browser_type does not — \
-it appends keystrokes.
-- exec_run processes persist until killed or the server shuts down. Clean up with \
-exec_kill when done.
-- file_read returns base64. Decode it before interpreting content.
+- Desktop coordinates are absolute pixels. After any window move/resize, \
+re-screenshot before clicking. Moving the mouse to (0,0) aborts (failsafe).
+- browser fill clears before typing; browser type appends. To select all \
+first: press_key key="Control+a". desktop type_text is ASCII-only — for \
+Unicode use browser fill or eval_js.
+- Processes persist until killed or server shutdown — kill when done.
+- file read returns base64 — decode before interpreting.
 """
 
 mcp = FastMCP(
