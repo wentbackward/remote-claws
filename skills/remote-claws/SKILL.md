@@ -1,6 +1,6 @@
 ---
 name: remote-claws
-description: "Full remote desktop control of a machine via Remote Claws MCP. Use when asked to: take a screenshot of the remote desktop; click, type, or drag with the mouse/keyboard on the remote machine; run commands or scripts on it; automate the browser on the remote machine; read or write files on the remote machine."
+description: "Full control of a remote machine via Remote Claws MCP: screenshots, mouse/keyboard, browser automation, run commands, read/write files on the remote host."
 homepage: https://github.com/wentbackward/remote-claws
 ---
 

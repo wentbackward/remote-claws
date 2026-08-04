@@ -116,11 +116,11 @@ Or from chat:
 
 ### Option B — Create it manually
 
-Copy `openclaw/SKILL.md` from this repository into your skills directory:
+Copy the `skills/remote-claws/` skill folder from this repository into your skills directory:
 
 ```bash
 mkdir -p ~/workspace/skills/remote-claws
-cp openclaw/SKILL.md ~/workspace/skills/remote-claws/SKILL.md
+cp skills/remote-claws/SKILL.md ~/workspace/skills/remote-claws/SKILL.md
 ```
 
 ---

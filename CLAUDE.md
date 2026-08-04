@@ -62,3 +62,14 @@ Bearer token auth via the MCP SDK's `TokenVerifier`. Run `remote-claws-setup` to
 - Exec processes tracked by 8-char hex UUID in `app.processes` dict, with background coroutines streaming stdout/stderr into list buffers
 - `pyautogui.FAILSAFE = True` — mouse to (0,0) aborts as safety measure
 - Results are capped: `remote_files` action `list` at 500 entries, `remote_desktop` action `list_elements` at 200
+
+## OpenClaw Skill (ClawHub)
+
+The OpenClaw skill lives at `skills/remote-claws/SKILL.md` — folder name and frontmatter `name` must stay aligned (`remote-claws`), and `description` must stay under 160 chars. It is published to ClawHub from that folder:
+
+```bash
+npm i -g clawhub && clawhub login
+clawhub skill publish ./skills/remote-claws --version <x.y.z>
+```
+
+Version/changelog are publish-time flags, never file content — do not put a version in SKILL.md. New releases are hidden until ClawHub's automated security review completes.
