@@ -293,7 +293,6 @@ Copy `remote-claws.example.json` as a starting point:
 cp remote-claws.example.json remote-claws.json
 ```
 
-You can also use a `.env` file alongside it — pydantic-settings reads `.env` files automatically.
 
 ### Environment Variables
 

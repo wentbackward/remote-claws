@@ -98,10 +98,34 @@ class AppConfig(BaseSettings):
             os.environ.get("REMOTE_CLAWS_CONFIG_FILE", "remote-claws.json"),
         )
         file_values = load_config_file(cf)
-        # File values are defaults that env vars override (pydantic-settings
-        # reads env vars automatically, so we just merge file values under them)
-        merged = {**file_values, **overrides}
+        # Priority: explicit overrides (argv) > env vars > config file >
+        # defaults. pydantic-settings ranks init kwargs ABOVE env vars, so
+        # file values must not be passed for fields whose env var is set —
+        # otherwise the file would silently beat the environment.
+        merged = {
+            key: value
+            for key, value in file_values.items()
+            if f"REMOTE_CLAWS_{key.upper()}" not in os.environ
+        }
+        merged.update(overrides)
         super().__init__(**merged)
+        # Retained for source_of() provenance reporting.
+        self._file_keys = set(file_values)
+        self._override_keys = set(overrides) - {"config_file"}
+        self._config_file_used = cf
+
+    def source_of(self, field: str) -> str:
+        """Report where a config field's effective value came from — for
+        startup logging, so 'why is channel chromium?!' is answerable from
+        the log instead of a forensic session."""
+        if field in self._override_keys:
+            return "explicit override"
+        env_name = f"REMOTE_CLAWS_{field.upper()}"
+        if env_name in os.environ:
+            return f"env var {env_name}"
+        if field in self._file_keys:
+            return f"config file {self._config_file_used}"
+        return "default"
 
     def get_allowed_ips(self) -> list[str]:
         """Parse allowed_ips into a list. Returns [] to disable IP filtering."""

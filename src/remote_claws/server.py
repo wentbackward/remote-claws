@@ -143,8 +143,9 @@ def _build_app_context() -> AppContext:
         # call — a wrong channel (e.g. a stale REMOTE_CLAWS_BROWSER_CHANNEL
         # in the shell session) is then obvious the moment the server starts.
         logger.info(
-            "Browser config: channel=%s, profile=%s, headless=%s, stealth=%s",
+            "Browser config: channel=%s (source: %s), profile=%s, headless=%s, stealth=%s",
             _CONFIG.browser_channel,
+            _CONFIG.source_of("browser_channel"),
             browser.profile_dir,
             _CONFIG.browser_headless,
             _CONFIG.browser_stealth,

@@ -45,6 +45,21 @@ def run_browser_setup(url: str | None = None) -> int:
         )
         return 1
 
+    # This tool seeds the profile with REAL Chrome. If the server is
+    # configured for a different channel (e.g. a leftover browser_channel
+    # in remote-claws.json), the server will refuse to start with this
+    # profile. Warn now, while the operator is here to fix it.
+    if config.browser_channel != "chrome":
+        print(
+            f"WARNING: browser_channel is '{config.browser_channel}' "
+            f"(from {config.source_of('browser_channel')}), but this setup "
+            "launches real Google Chrome and stamps the profile as 'chrome'.\n"
+            "The server will refuse to start with this profile while the "
+            f"channel is '{config.browser_channel}'. Fix the setting, or point "
+            "REMOTE_CLAWS_BROWSER_PROFILE_DIR at a separate directory.\n",
+            file=sys.stderr,
+        )
+
     if is_profile_locked(profile_dir):
         print(
             f"ERROR: Chrome profile at {profile_dir} appears to be in use.\n"

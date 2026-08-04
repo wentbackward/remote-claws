@@ -33,6 +33,34 @@ def test_json_file_override(tmp_path):
     assert cfg.transport == "streamable-http"
 
 
+def test_env_var_beats_config_file(tmp_path, monkeypatch):
+    """Documented priority is env > file > default. Regression test: file
+    values are passed as init kwargs, which pydantic-settings ranks above
+    env vars — the merge must suppress file values when the env var is set."""
+    config_file = tmp_path / "c.json"
+    config_file.write_text(json.dumps({"port": 8080}))
+    monkeypatch.setenv("REMOTE_CLAWS_PORT", "9999")
+    cfg = AppConfig(config_file=str(config_file))
+    assert cfg.port == 9999
+
+
+def test_explicit_override_beats_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("REMOTE_CLAWS_PORT", "9999")
+    cfg = AppConfig(config_file=str(tmp_path / "missing.json"), port=1234)
+    assert cfg.port == 1234
+
+
+def test_source_of_provenance(tmp_path, monkeypatch):
+    config_file = tmp_path / "c.json"
+    config_file.write_text(json.dumps({"browser_channel": "chromium"}))
+    monkeypatch.setenv("REMOTE_CLAWS_PORT", "9999")
+    cfg = AppConfig(config_file=str(config_file), host="1.2.3.4")
+    assert cfg.source_of("host") == "explicit override"
+    assert cfg.source_of("port") == "env var REMOTE_CLAWS_PORT"
+    assert cfg.source_of("browser_channel") == f"config file {config_file}"
+    assert cfg.source_of("browser_stealth") == "default"
+
+
 def test_env_var_expansion_in_file(tmp_path):
     config_file = tmp_path / "exp.json"
     config_file.write_text(json.dumps({"port": "${MY_TEST_PORT:-5555}"}))
