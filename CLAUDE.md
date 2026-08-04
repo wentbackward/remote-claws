@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Remote Claws is an MCP (Model Context Protocol) server for remote machine control. It exposes 39 tools over SSE/HTTP across four groups: browser automation (Playwright), desktop control (pyautogui/pywinauto), async command execution, and file transfer.
+Remote Claws is an MCP (Model Context Protocol) server for remote machine control. It exposes 39 tools over HTTP (SSE or Streamable HTTP) across four groups: browser automation (Playwright), desktop control (pyautogui/pywinauto), async command execution, and file transfer.
 
 ## Setup & Running
 
@@ -13,11 +13,11 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e .
 playwright install chromium
-remote-claws-setup            # generates auth token (shown once) and saves hash
-remote-claws                  # starts SSE server on 0.0.0.0:8080
+remote-claws-setup            # generates auth token, picks transport (SSE or Streamable HTTP)
+remote-claws                  # starts server on 0.0.0.0:8080
 ```
 
-Agents connect to `http://<ip>:8080/sse` with `Authorization: Bearer <token>`. Entry point is `remote_claws.server:main`. The server refuses to start without an auth file — run `remote-claws-setup` first.
+Agents connect to `http://<ip>:8080/sse` (SSE) or `http://<ip>:8080/mcp` (Streamable HTTP) with `Authorization: Bearer <token>`. Entry point is `remote_claws.server:main`. The server refuses to start without an auth file — run `remote-claws-setup` first.
 
 ## Configuration
 
@@ -32,6 +32,7 @@ Key settings:
 - `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`
 - `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
 - `REMOTE_CLAWS_ENABLED_GROUPS` (default: `browser,desktop,exec,files`): comma-separated list of tool groups to load at startup. Groups not listed are never imported (Playwright / pyautogui are not loaded), and none of their tools are registered. Use this to keep heavy dependencies out of memory on machines that don't need them.
+- `REMOTE_CLAWS_TRANSPORT` (default: `sse`): MCP transport — `sse` or `streamable-http`
 - `REMOTE_CLAWS_AUTH_FILE` (default: `.remote-claws-auth.json`)
 - `REMOTE_CLAWS_CONFIG_FILE` (default: `remote-claws.json`)
 

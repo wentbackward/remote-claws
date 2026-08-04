@@ -19,6 +19,7 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
     its X11/Win32 side effects) out of memory entirely."""
 
     import pyautogui
+
     # Keep failsafe enabled — moving mouse to (0,0) aborts
     pyautogui.FAILSAFE = True
 
@@ -35,14 +36,15 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
     ) -> Image:
         """Take a screenshot of the entire desktop or a region [x, y, width, height]. Returns JPEG image."""
         app = _get_ctx(ctx)
-        if region and len(region) == 4:
+        # Ternary would obscure the intent — explicit if/else is clearer.
+        if region and len(region) == 4:  # noqa: SIM108
             pil_img = pyautogui.screenshot(region=tuple(region))
         else:
             pil_img = pyautogui.screenshot()
         buf = io.BytesIO()
         pil_img.save(buf, format="PNG")
         save_path = make_save_path(app.config.screenshot_dir) if save_to_disk else None
-        jpeg_bytes, saved = downscale_and_encode(
+        jpeg_bytes, _saved = downscale_and_encode(
             buf.getvalue(),
             max_width=app.config.screenshot_max_width,
             max_height=app.config.screenshot_max_height,
@@ -99,6 +101,7 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
     def desktop_find_window(title: str = "", class_name: str = "", ctx: Context = None) -> str:
         """Find windows by title substring or class name using pywinauto. Returns JSON list."""
         from pywinauto import Desktop
+
         desktop = Desktop(backend="uia")
         windows = desktop.windows()
         results = []
@@ -109,22 +112,25 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
                 continue
             if class_name and class_name.lower() not in win_class.lower():
                 continue
-            results.append({
-                "title": win_title,
-                "class_name": win_class,
-                "rectangle": {
-                    "left": win.rectangle().left,
-                    "top": win.rectangle().top,
-                    "right": win.rectangle().right,
-                    "bottom": win.rectangle().bottom,
-                },
-            })
+            results.append(
+                {
+                    "title": win_title,
+                    "class_name": win_class,
+                    "rectangle": {
+                        "left": win.rectangle().left,
+                        "top": win.rectangle().top,
+                        "right": win.rectangle().right,
+                        "bottom": win.rectangle().bottom,
+                    },
+                }
+            )
         return json.dumps(results, indent=2)
 
     @expose
     def desktop_focus_window(title: str, ctx: Context = None) -> str:
         """Bring a window to the foreground by title substring."""
         from pywinauto import Desktop
+
         desktop = Desktop(backend="uia")
         for win in desktop.windows():
             if title.lower() in win.window_text().lower():
@@ -133,9 +139,12 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         return f"No window found matching: {title}"
 
     @expose
-    def desktop_list_elements(window_title: str, control_type: str = "", max_depth: int = 4, ctx: Context = None) -> str:
+    def desktop_list_elements(
+        window_title: str, control_type: str = "", max_depth: int = 4, ctx: Context = None
+    ) -> str:
         """List UI elements in a window. Optionally filter by control_type (e.g. 'Button', 'Edit')."""
         from pywinauto import Desktop
+
         desktop = Desktop(backend="uia")
         target = None
         for win in desktop.windows():
@@ -150,17 +159,20 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
             ct = child.element_info.control_type
             if control_type and ct != control_type:
                 continue
-            elements.append({
-                "name": child.element_info.name,
-                "control_type": ct,
-                "automation_id": child.element_info.automation_id,
-            })
+            elements.append(
+                {
+                    "name": child.element_info.name,
+                    "control_type": ct,
+                    "automation_id": child.element_info.automation_id,
+                }
+            )
         return json.dumps(elements[:200], indent=2)  # cap at 200
 
     @expose
     def desktop_click_element(window_title: str, element_name: str, control_type: str = "", ctx: Context = None) -> str:
         """Click a specific UI element by name within a window (pywinauto)."""
         from pywinauto import Desktop
+
         desktop = Desktop(backend="uia")
         target = None
         for win in desktop.windows():
@@ -180,9 +192,12 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         return f"Element not found: {element_name}"
 
     @expose
-    def desktop_get_element_text(window_title: str, element_name: str, control_type: str = "", ctx: Context = None) -> str:
+    def desktop_get_element_text(
+        window_title: str, element_name: str, control_type: str = "", ctx: Context = None
+    ) -> str:
         """Get text/value from a UI element by name within a window."""
         from pywinauto import Desktop
+
         desktop = Desktop(backend="uia")
         target = None
         for win in desktop.windows():

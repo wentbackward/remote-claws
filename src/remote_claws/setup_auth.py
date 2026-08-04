@@ -37,9 +37,7 @@ def _generate_token(auth_path: Path) -> bool:
     user chose to keep the existing one."""
     if auth_path.exists():
         print(f"Auth file already exists: {auth_path}")
-        response = input(
-            "Overwrite and generate a new token? [y/N] "
-        ).strip().lower()
+        response = input("Overwrite and generate a new token? [y/N] ").strip().lower()
         if response not in {"y", "yes"}:
             return False
 
@@ -135,17 +133,22 @@ def _maybe_run_browser_setup() -> None:
     """
     if not sys.stdin.isatty():
         return
-    response = input(
-        "Set up the dedicated Chrome profile now so the agent can\n"
-        "browse with your identity (sign into services, install adblocker,\n"
-        "accept cookie banners)? [Y/n] "
-    ).strip().lower()
+    response = (
+        input(
+            "Set up the dedicated Chrome profile now so the agent can\n"
+            "browse with your identity (sign into services, install adblocker,\n"
+            "accept cookie banners)? [Y/n] "
+        )
+        .strip()
+        .lower()
+    )
     if response and response not in {"y", "yes"}:
         print("Skipped. Run `remote-claws-browser-setup` later when ready.")
         return
     # Imported lazily so a missing browser dep (Chrome not installed yet)
     # doesn't break auth-only setup runs.
     from remote_claws.browser.setup import run_browser_setup
+
     run_browser_setup()
 
 

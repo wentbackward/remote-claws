@@ -12,5 +12,6 @@
   "screenshot_quality": 75,
   "permissions_file": "permissions.json",
   "auth_file": ".remote-claws-auth.json",
-  "enabled_groups": "browser,desktop,exec,files"
+  "enabled_groups": "browser,desktop,exec,files",
+  "transport": "sse"
 }

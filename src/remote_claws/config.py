@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _expand_env_vars(value: str) -> str:
     """Replace ${VAR_NAME} or ${VAR_NAME:-default} with env var values."""
+
     def replacer(match: re.Match) -> str:
         var = match.group(1)
         if ":-" in var:

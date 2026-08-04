@@ -19,8 +19,7 @@ def load_token_hash(auth_file: str) -> str:
     p = Path(auth_file)
     if not p.exists():
         raise FileNotFoundError(
-            f"Auth file not found: {auth_file}\n"
-            f"Run 'remote-claws-setup' to generate authentication credentials."
+            f"Auth file not found: {auth_file}\nRun 'remote-claws-setup' to generate authentication credentials."
         )
     with open(p) as f:
         data = json.load(f)

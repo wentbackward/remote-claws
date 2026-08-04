@@ -45,18 +45,21 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         with open(p, "rb") as f:
             if offset > 0:
                 f.seek(offset)
-            if limit > 0:
+            # Explicit if/else is clearer than ternary for read operations.
+            if limit > 0:  # noqa: SIM108
                 data = f.read(limit)
             else:
                 data = f.read()
 
-        return json.dumps({
-            "path": str(p.resolve()),
-            "size": file_size,
-            "offset": offset,
-            "bytes_read": len(data),
-            "content_base64": base64.b64encode(data).decode(),
-        })
+        return json.dumps(
+            {
+                "path": str(p.resolve()),
+                "size": file_size,
+                "offset": offset,
+                "bytes_read": len(data),
+                "content_base64": base64.b64encode(data).decode(),
+            }
+        )
 
     @expose
     def file_list(path: str = ".", pattern: str = "*", recursive: bool = False, ctx: Context = None) -> str:
@@ -68,7 +71,8 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         if not p.exists():
             return json.dumps({"error": f"Path not found: {path}"})
 
-        if recursive:
+        # Explicit if/else is clearer than ternary for glob operations.
+        if recursive:  # noqa: SIM108
             entries = list(p.rglob(pattern))
         else:
             entries = list(p.glob(pattern))
@@ -77,12 +81,14 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         for entry in entries[:500]:  # cap results
             try:
                 stat = entry.stat()
-                results.append({
-                    "path": str(entry),
-                    "is_dir": entry.is_dir(),
-                    "size": stat.st_size if not entry.is_dir() else None,
-                    "modified": stat.st_mtime,
-                })
+                results.append(
+                    {
+                        "path": str(entry),
+                        "is_dir": entry.is_dir(),
+                        "size": stat.st_size if not entry.is_dir() else None,
+                        "modified": stat.st_mtime,
+                    }
+                )
             except OSError:
                 continue
 
@@ -121,11 +127,13 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
             return json.dumps({"exists": False, "path": path})
 
         stat = p.stat()
-        return json.dumps({
-            "exists": True,
-            "path": str(p.resolve()),
-            "is_dir": p.is_dir(),
-            "size": stat.st_size,
-            "modified": stat.st_mtime,
-            "created": stat.st_ctime,
-        })
+        return json.dumps(
+            {
+                "exists": True,
+                "path": str(p.resolve()),
+                "is_dir": p.is_dir(),
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "created": stat.st_ctime,
+            }
+        )

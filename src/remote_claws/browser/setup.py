@@ -10,12 +10,12 @@ That matters for login flows that sniff for automation: even a brief
 encounter with `navigator.webdriver = true` during sign-in can poison
 the session.
 """
+
 from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
-from pathlib import Path
 
 from remote_claws.browser.profile import (
     find_chrome_executable,
