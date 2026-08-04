@@ -74,3 +74,21 @@ def test_preflight_error_names_remedies(tmp_path):
     assert "REMOTE_CLAWS_BROWSER_CHANNEL" in msg
     assert "REMOTE_CLAWS_BROWSER_PROFILE_DIR" in msg
     assert ".remote-claws-channel" in msg
+
+
+def test_stealth_applier_active_with_installed_package(tmp_path):
+    """Against whatever tf-playwright-stealth version is installed (1.1.x
+    Stealth class or 1.2+ stealth_async), the applier must resolve."""
+    pytest.importorskip("playwright_stealth")
+    mgr = BrowserManager(_config(tmp_path, "chromium"))
+    apply_fn, status = mgr._build_stealth_applier()
+    assert status == "active"
+    assert apply_fn is not None
+
+
+def test_stealth_applier_disabled_by_config(tmp_path):
+    mgr = BrowserManager(_config(tmp_path, "chromium"))
+    mgr._config.browser_stealth = False
+    apply_fn, status = mgr._build_stealth_applier()
+    assert apply_fn is None
+    assert status == "disabled"

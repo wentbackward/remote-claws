@@ -130,6 +130,16 @@ async def app_lifespan(server: FastMCP):
         except BrowserStartupError as exc:
             logger.error("Browser preflight failed: %s", exc)
             raise
+        # Surface the resolved browser config at boot, not on first tool
+        # call — a wrong channel (e.g. a stale REMOTE_CLAWS_BROWSER_CHANNEL
+        # in the shell session) is then obvious the moment the server starts.
+        logger.info(
+            "Browser config: channel=%s, profile=%s, headless=%s, stealth=%s",
+            config.browser_channel,
+            browser.profile_dir,
+            config.browser_headless,
+            config.browser_stealth,
+        )
 
     logger.info("RemoteClaws starting up (host=%s, port=%s)", config.host, config.port)
     try:

@@ -48,6 +48,11 @@ class BrowserManager:
         self._lock = asyncio.Lock()
         self._stealth_apply, self._stealth_status = self._build_stealth_applier()
 
+    @property
+    def profile_dir(self) -> Path:
+        """The resolved user-data directory the browser context will launch against."""
+        return self._profile_dir
+
     # ----- startup-time check (no Playwright launch) ------------------------
 
     def preflight(self) -> None:
@@ -203,13 +208,16 @@ class BrowserManager:
         operators can see at a glance whether stealth is actually active
         ('active'), disabled by config ('disabled'), or requested but the
         library is missing ('unavailable: install tf-playwright-stealth').
+
+        tf-playwright-stealth 1.2+ exposes a module-level stealth_async();
+        1.1.x exposed a Stealth class with apply_stealth_async(). Support
+        both — installed 1.1.x versions in the wild must keep working.
         """
         if not self._config.browser_stealth:
             return None, "disabled"
         try:
-            # tf-playwright-stealth ships under the playwright_stealth name
-            # and exposes a Stealth class with apply_stealth_async().
-            from playwright_stealth import Stealth  # type: ignore
+            # tf-playwright-stealth ships under the playwright_stealth name.
+            import playwright_stealth
         except ImportError:
             logger.warning(
                 "browser_stealth=true but playwright_stealth is not installed; "
@@ -217,9 +225,27 @@ class BrowserManager:
                 "pip install tf-playwright-stealth"
             )
             return None, "unavailable (pip install tf-playwright-stealth)"
+
+        stealth_async = getattr(playwright_stealth, "stealth_async", None)
+        if stealth_async is not None:
+
+            async def _apply(page: Page) -> None:
+                await stealth_async(page)
+
+            return _apply, "active"
+
+        try:
+            from playwright_stealth import Stealth  # type: ignore
+        except ImportError:
+            logger.warning(
+                "playwright_stealth is installed but exposes neither "
+                "stealth_async nor the Stealth class; continuing without "
+                "stealth patches."
+            )
+            return None, "unavailable (unsupported tf-playwright-stealth version)"
         stealth = Stealth()
 
-        async def _apply(page: Page) -> None:
+        async def _apply_legacy(page: Page) -> None:
             await stealth.apply_stealth_async(page)
 
-        return _apply, "active"
+        return _apply_legacy, "active"
