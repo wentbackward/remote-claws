@@ -2,32 +2,34 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from collections.abc import Iterable
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Group prefix mapping: tool name prefix -> group key in permissions.json.
-# This is the single source of truth for which groups exist.
-GROUP_PREFIXES: dict[str, str] = {
-    "browser_": "browser",
-    "desktop_": "desktop",
-    "exec_": "exec",
-    "file_": "files",
-}
+ALL_GROUPS: tuple[str, ...] = ("browser", "desktop", "exec", "files")
 
-ALL_GROUPS: tuple[str, ...] = tuple(GROUP_PREFIXES.values())
+# Pre-consolidation permissions.json entries were full tool names
+# (browser_navigate, exec_run, file_read, ...). Action names are now bare
+# (navigate, run, read). Strip the legacy prefix at load so existing policy
+# files keep working; a warning nudges operators to update the file.
+LEGACY_PREFIXES: dict[str, str] = {
+    "browser": "browser_",
+    "desktop": "desktop_",
+    "exec": "exec_",
+    "files": "file_",
+}
 
 
 class PermissionChecker:
     """Loads the policy in permissions.json and answers two questions:
 
-    - is_allowed(tool_name): is this specific tool permitted?
-    - is_group_active(group): could any tool in this group ever be permitted?
-
-    The checker is evaluated at tool registration time, so disallowed tools are
-    never exposed to clients. There is no runtime re-check — the policy is
-    fixed for the lifetime of the process.
+    - is_group_active(group): should this group's tool be registered at all?
+      Consulted at registration time — an inactive group means the tool is
+      never exposed to clients and its heavy deps are never imported.
+    - is_action_allowed(group, action): may this action run? Consulted by
+      the dispatcher at call time, because one tool per group can no longer
+      hide individual actions from tools/list. Deny always supersedes allow.
     """
 
     def __init__(
@@ -49,18 +51,33 @@ class PermissionChecker:
         with open(p) as f:
             data = json.load(f)
         self._permissions = data.get("permissions", {})
+        self._normalize_legacy_entries()
         logger.info("Loaded permissions from %s", path)
 
-    def _group_for(self, tool_name: str) -> str | None:
-        for prefix, group in GROUP_PREFIXES.items():
-            if tool_name.startswith(prefix):
-                return group
-        return None
+    def _normalize_legacy_entries(self) -> None:
+        for group, rules in self._permissions.items():
+            prefix = LEGACY_PREFIXES.get(group)
+            if not prefix:
+                continue
+            for key in ("allow", "deny"):
+                entries = rules.get(key) or []
+                normalized = []
+                for entry in entries:
+                    if entry != "*" and entry.startswith(prefix):
+                        stripped = entry[len(prefix):]
+                        logger.warning(
+                            "permissions.json: legacy entry %r in group %r — "
+                            "rename to the bare action name %r",
+                            entry, group, stripped,
+                        )
+                        entry = stripped
+                    normalized.append(entry)
+                rules[key] = normalized
 
     def is_group_active(self, group: str) -> bool:
         """True if the group is both enabled at startup and has a permissions
-        entry that could ever permit at least one tool. Used to decide whether
-        to import a group's heavy dependencies and call its register()."""
+        entry that could ever permit at least one action. Used to decide
+        whether to import a group's heavy dependencies and register its tool."""
         if group not in ALL_GROUPS:
             return False
         if self._enabled_groups is not None and group not in self._enabled_groups:
@@ -73,21 +90,17 @@ class PermissionChecker:
         deny = group_perms.get("deny", []) or []
         allow = group_perms.get("allow", []) or []
 
-        # If everything is denied wholesale, the group can't have any active tool.
+        # If everything is denied wholesale, the group can't have any active action.
         if "*" in deny:
             return False
-        # The group must permit at least one specific tool or all tools.
+        # The group must permit at least one specific action or all actions.
         return bool(allow)
 
-    def is_allowed(self, tool_name: str) -> bool:
-        """True if this specific tool may be exposed.
-
-        Deny entries always supersede allow entries. The startup
-        ``enabled_groups`` filter, if set, hides whole groups regardless of
-        what the JSON file says.
-        """
-        group = self._group_for(tool_name)
-        if group is None:
+    def is_action_allowed(self, group: str, action: str) -> bool:
+        """True if this action may execute. Deny entries always supersede
+        allow entries. The startup ``enabled_groups`` filter, if set, blocks
+        whole groups regardless of what the JSON file says."""
+        if group not in ALL_GROUPS:
             return False
         if self._enabled_groups is not None and group not in self._enabled_groups:
             return False
@@ -99,6 +112,6 @@ class PermissionChecker:
         deny = group_perms.get("deny", []) or []
         allow = group_perms.get("allow", []) or []
 
-        if tool_name in deny or "*" in deny:
+        if action in deny or "*" in deny:
             return False
-        return bool(tool_name in allow or "*" in allow)
+        return bool(action in allow or "*" in allow)

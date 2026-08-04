@@ -1,4 +1,4 @@
-"""Test permission filtering: group activation, allow/deny, default-deny."""
+"""Test permission filtering: group activation, action allow/deny, default-deny."""
 
 import json
 
@@ -10,91 +10,93 @@ def _make_perms(data: dict) -> dict:
     return {"permissions": data}
 
 
+def _write(tmp_path, data: dict) -> str:
+    perms = tmp_path / "perms.json"
+    perms.write_text(json.dumps(_make_perms(data)))
+    return str(perms)
+
+
 def test_default_deny_all(tmp_path):
     """With no permissions.json, everything is denied."""
     checker = PermissionChecker(str(tmp_path / "missing.json"), enabled_groups=["browser"])
-    assert checker.is_allowed("browser_navigate") is False
+    assert checker.is_action_allowed("browser", "navigate") is False
 
 
-def test_allow_single_tool(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({"browser": {"allow": ["browser_navigate"]}})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser"])
-    assert checker.is_allowed("browser_navigate") is True
-    assert checker.is_allowed("browser_click") is False  # not listed
+def test_allow_single_action(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["navigate"]}}),
+        enabled_groups=["browser"],
+    )
+    assert checker.is_action_allowed("browser", "navigate") is True
+    assert checker.is_action_allowed("browser", "click") is False  # not listed
 
 
-def test_allow_all_tools(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({"browser": {"allow": ["*"]}})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser"])
-    assert checker.is_allowed("browser_navigate") is True
-    assert checker.is_allowed("browser_click") is True
+def test_allow_all_actions(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["*"]}}),
+        enabled_groups=["browser"],
+    )
+    assert checker.is_action_allowed("browser", "navigate") is True
+    assert checker.is_action_allowed("browser", "click") is True
 
 
 def test_deny_overrides_allow(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({"browser": {"allow": ["*"], "deny": ["browser_navigate"]}})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser"])
-    assert checker.is_allowed("browser_navigate") is False
-    assert checker.is_allowed("browser_click") is True
-
-
-def test_deny_all(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({"browser": {"allow": ["*"], "deny": ["*"]}})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser"])
-    assert checker.is_allowed("browser_navigate") is False
-
-
-def test_is_group_active_respects_enabled_groups(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(
-        json.dumps(
-            _make_perms(
-                {
-                    "browser": {"allow": ["*"]},
-                    "exec": {"allow": ["*"]},
-                }
-            )
-        )
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["*"], "deny": ["eval_js"]}}),
+        enabled_groups=["browser"],
     )
-    checker = PermissionChecker(str(perms), enabled_groups=["browser", "exec"])
+    assert checker.is_action_allowed("browser", "eval_js") is False
+    assert checker.is_action_allowed("browser", "navigate") is True
+
+
+def test_deny_star_blocks_everything(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"exec": {"allow": ["*"], "deny": ["*"]}}),
+        enabled_groups=["exec"],
+    )
+    assert checker.is_action_allowed("exec", "run") is False
+
+
+def test_unknown_group_denied(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["*"]}}),
+        enabled_groups=["browser"],
+    )
+    assert checker.is_action_allowed("nosuch", "navigate") is False
+
+
+def test_disabled_group_denied_even_when_allowed(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["*"]}}),
+        enabled_groups=["exec"],
+    )
+    assert checker.is_action_allowed("browser", "navigate") is False
+
+
+def test_legacy_tool_names_normalized(tmp_path):
+    """Old-style entries (browser_navigate, exec_run, file_read) keep working."""
+    checker = PermissionChecker(
+        _write(tmp_path, {
+            "browser": {"allow": ["browser_navigate"]},
+            "exec": {"allow": ["*"], "deny": ["exec_kill"]},
+            "files": {"allow": ["file_read"]},
+        }),
+        enabled_groups=["browser", "exec", "files"],
+    )
+    assert checker.is_action_allowed("browser", "navigate") is True
+    assert checker.is_action_allowed("browser", "click") is False
+    assert checker.is_action_allowed("exec", "kill") is False
+    assert checker.is_action_allowed("exec", "run") is True
+    assert checker.is_action_allowed("files", "read") is True
+    assert checker.is_action_allowed("files", "write") is False
+
+
+def test_is_group_active_unchanged(tmp_path):
+    checker = PermissionChecker(
+        _write(tmp_path, {"browser": {"allow": ["*"]}, "exec": {"deny": ["*"]}}),
+        enabled_groups=None,
+    )
     assert checker.is_group_active("browser") is True
-    assert checker.is_group_active("exec") is True
-    assert checker.is_group_active("desktop") is False
-    assert checker.is_group_active("files") is False
-
-
-def test_is_group_inactive_when_not_in_perms(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({"browser": {"allow": ["*"]}})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser", "desktop"])
-    # desktop is enabled but has no permissions entry → inactive
-    assert checker.is_group_active("desktop") is False
-
-
-def test_unknown_group_always_inactive(tmp_path):
-    perms = tmp_path / "perms.json"
-    perms.write_text(json.dumps(_make_perms({})))
-    checker = PermissionChecker(str(perms), enabled_groups=["browser"])
-    assert checker.is_group_active("nonexistent_group") is False
-
-
-def test_tool_prefix_mapping(tmp_path):
-    """Verify tool names map to correct groups via prefix."""
-    perms = tmp_path / "perms.json"
-    perms.write_text(
-        json.dumps(
-            _make_perms(
-                {
-                    "exec": {"allow": ["exec_run"]},
-                    "files": {"allow": ["file_read"]},
-                }
-            )
-        )
-    )
-    checker = PermissionChecker(str(perms), enabled_groups=["exec", "files"])
-    assert checker.is_allowed("exec_run") is True
-    assert checker.is_allowed("file_read") is True
-    assert checker.is_allowed("exec_kill") is False  # not allowed
+    assert checker.is_group_active("exec") is False  # wholesale deny
+    assert checker.is_group_active("desktop") is False  # no entry
+    assert checker.is_group_active("nosuch") is False

@@ -37,11 +37,11 @@ def test_transport_streamable_http(tmp_path, monkeypatch):
 def test_permissions_checker_created_at_startup(tmp_path):
     """Permissions checker should be created from config."""
     perms_file = tmp_path / "perms.json"
-    perms_file.write_text(json.dumps(_make_perms({"browser": {"allow": ["browser_navigate"]}})))
+    perms_file.write_text(json.dumps(_make_perms({"browser": {"allow": ["navigate"]}})))
     cfg = AppConfig(permissions_file=str(perms_file))
     checker = PermissionChecker(cfg.permissions_file, enabled_groups=cfg.get_enabled_groups())
-    assert checker.is_allowed("browser_navigate") is True
-    assert checker.is_allowed("browser_click") is False  # not in perms
+    assert checker.is_action_allowed("browser", "navigate") is True
+    assert checker.is_action_allowed("browser", "click") is False  # not in perms
 
 
 def test_enabled_groups_filter(tmp_path):
