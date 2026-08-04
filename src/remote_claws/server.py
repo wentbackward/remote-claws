@@ -416,6 +416,12 @@ def main():
 
     if config.transport == "streamable-http":
         logger.info("Transport: streamable-HTTP (MCP spec 2025-03-26+)")
+        # Run the MCP session layer statelessly. All of our real state lives
+        # in AppContext (browser manager, process table), not in MCP sessions.
+        # Stateful sessions are held in server memory, so every server restart
+        # bricked every connected client with 404 "Session not found" until
+        # the client re-initialized. Stateless requests are self-contained.
+        mcp.settings.stateless_http = True
         starlette_app = mcp.streamable_http_app()
     else:
         logger.info("Transport: SSE (legacy)")
