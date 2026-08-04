@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Remote Claws is an MCP (Model Context Protocol) server for remote machine control. It exposes 39 tools over HTTP (SSE or Streamable HTTP) across four groups: browser automation (Playwright), desktop control (pyautogui/pywinauto), async command execution, and file transfer.
+Remote Claws is an MCP (Model Context Protocol) server for remote machine control. It exposes 4 tools (39 actions) over HTTP (SSE or Streamable HTTP): `remote_browser` (Playwright), `remote_desktop` (pyautogui/pywinauto), `remote_exec` (async command execution), and `remote_files` (file transfer). Each tool takes an `action` parameter plus params, like a CLI subcommand. The `remote_` prefix disambiguates from agents' built-in local tools (browser/exec/read/write).
 
 ## Setup & Running
 
@@ -44,9 +44,9 @@ Bearer token auth via the MCP SDK's `TokenVerifier`. Run `remote-claws-setup` to
 
 **Lifespan pattern**: `server.py` creates an `AppContext` dataclass (config, browser manager, permission checker, process tracker) in `app_lifespan()`. Every tool accesses it via `ctx.request_context.lifespan_context`.
 
-**Tool registration**: Each module (`browser/tools.py`, `desktop/tools.py`, `exec/tools.py`, `files/tools.py`) exports a `register(mcp: FastMCP)` function that decorates handlers with `@mcp.tool()`. This avoids circular imports — `server.py` creates the `mcp` instance, then calls each `register()`.
+**Tool registration & dispatch**: Each module (`browser/tools.py`, `desktop/tools.py`, `exec/tools.py`, `files/tools.py`) exposes a `HANDLERS` dict (action name → module-level handler function) and a `register(mcp, permissions)` function that registers ONE tool. The tool's `action` parameter routes through `dispatch.py::run_action`, which validates required params (non-empty), filters the flat param superset down to what the handler declares, and checks action-level permissions at call time. Handlers take `app` (the lifespan AppContext) as their first parameter.
 
-**Permission system** (`permissions.py`): Loads `permissions.json` at startup. Tool names map to groups via prefix (`browser_` → `browser`, `desktop_` → `desktop`, `exec_` → `exec`, `file_` → `files`). Deny always supersedes allow, default is deny-all. The checker is consulted **at tool registration time**, not at call time — disallowed tools are never registered with FastMCP and therefore never appear in the MCP `tools/list` response. There is no runtime re-check inside tool bodies because the policy is fixed for the life of the process. `is_group_active(group)` combines the JSON policy with the `enabled_groups` config so the lifespan can skip importing a group's heavy deps (e.g. Playwright) when the group is fully off.
+**Permission system** (`permissions.py`): Loads `permissions.json` at startup. Two-tier enforcement. Group level: `is_group_active(group)` is consulted **at registration time** — an inactive group's tool is never registered, never appears in `tools/list`, and its heavy deps (Playwright, pyautogui) are never imported. Action level: `is_action_allowed(group, action)` is consulted **at call time** by the dispatcher, because one tool per group can no longer hide individual actions from `tools/list`; a denied action returns a `permission denied` error string. Policy entries are bare action names (`navigate`, `run`, `read`); legacy pre-consolidation tool names (`browser_navigate`, `file_read`) are auto-normalized at load with a deprecation warning. Deny always supersedes allow, default is deny-all, and the policy is fixed for the life of the process.
 
 **Browser lifecycle** (`browser/manager.py`): Owns a single persistent `BrowserContext` for the lifetime of the server. Default channel is `chrome` (system Google Chrome) launched via `launch_persistent_context(user_data_dir=…)` so cookies / logins / extensions survive restarts. Stealth patches (`tf-playwright-stealth`) are applied to each new page when `browser_stealth` is true. Lazy: Playwright and Chrome only launch on first `get_page()` call, but a synchronous `preflight()` runs at server startup to fail fast when `browser_channel=chrome` and Chrome isn't installed. `browser/profile.py` contains pure helpers (default profile dir per OS, lock detection, Chrome executable discovery) shared with the `remote-claws-browser-setup` CLI — the setup CLI launches Chrome **directly via subprocess**, not through Playwright, so no automation flags are present during interactive sign-ins. Maintains a list of `Page` objects with an active index for tab management.
 
@@ -61,4 +61,4 @@ Bearer token auth via the MCP SDK's `TokenVerifier`. Run `remote-claws-setup` to
 - File content transfers use base64 encoding
 - Exec processes tracked by 8-char hex UUID in `app.processes` dict, with background coroutines streaming stdout/stderr into list buffers
 - `pyautogui.FAILSAFE = True` — mouse to (0,0) aborts as safety measure
-- Results are capped: `file_list` at 500 entries, `desktop_list_elements` at 200
+- Results are capped: `remote_files` action `list` at 500 entries, `remote_desktop` action `list_elements` at 200

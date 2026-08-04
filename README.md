@@ -9,14 +9,16 @@ An MCP server that gives AI agents full control of a remote desktop machine — 
 
 ## What It Does
 
-Remote Claws exposes **39 tools** over MCP via HTTP:
+Remote Claws exposes **4 tools (39 actions)** over MCP via HTTP. Each tool takes an `action` parameter, like a CLI subcommand:
 
-| Group | Tools | What It Controls |
-|-------|-------|-----------------|
-| **Browser** | 16 | Navigate, click, fill forms, read text, run JS, take screenshots — real Chrome with your identity |
-| **Desktop** | 12 | Mouse clicks, keyboard input, window management, UI element inspection — pyautogui + pywinauto |
-| **Exec** | 5 | Start processes, stream stdout/stderr, send stdin, kill — fully async |
-| **Files** | 6 | Read, write, list, move, delete — base64 transfer with chunked reads |
+| Tool | Actions | What It Controls |
+|------|---------|-----------------|
+| **remote_browser** | 16 | Navigate, click, fill forms, read text, run JS, take screenshots — real Chrome with your identity |
+| **remote_desktop** | 12 | Mouse clicks, keyboard input, window management, UI element inspection — pyautogui + pywinauto |
+| **remote_exec** | 5 | Start processes, stream stdout/stderr, send stdin, kill — fully async |
+| **remote_files** | 6 | Read, write, list, move, delete — base64 transfer with chunked reads |
+
+The `remote_` prefix is deliberate: agents often have their own local `browser`/`exec`/`read`/`write` tools, and identical names cause the model to confuse which machine it's acting on.
 
 See [TOOLS.md](TOOLS.md) for the complete tool reference and [SKILLS.md](SKILLS.md) for a high-level capability overview.
 
@@ -83,22 +85,27 @@ To rotate the token, run `remote-claws-setup` again.
 
 ### Permission Policy
 
-`permissions.json` controls which tools are available. Each tool group (`browser`, `desktop`, `exec`, `files`) has `allow` and `deny` lists. **Deny always supersedes allow.**
+`permissions.json` controls what the agent can do. Each tool group (`browser`, `desktop`, `exec`, `files`) has `allow` and `deny` lists of **bare action names**. **Deny always supersedes allow.**
 
 ```json
 {
   "permissions": {
     "browser": { "allow": ["*"], "deny": [] },
-    "desktop": { "allow": ["*"], "deny": ["desktop_click_element"] },
-    "exec":    { "allow": ["exec_run", "exec_get_output", "exec_list"], "deny": [] },
-    "files":   { "allow": ["file_read", "file_list", "file_info"], "deny": [] }
+    "desktop": { "allow": ["*"], "deny": ["click_element"] },
+    "exec":    { "allow": ["run", "get_output", "list"], "deny": [] },
+    "files":   { "allow": ["read", "list", "info"], "deny": [] }
   }
 }
 ```
 
 Use `"*"` to allow/deny an entire group. Omitting a group denies it entirely.
 
-Disallowed tools are not registered with the MCP server, so they don't show up in `tools/list` at all — the agent simply doesn't see them. There is no "permission denied" runtime error.
+Enforcement is two-tier:
+
+- **Group level (registration time):** a disabled or fully-denied group means its tool is never registered — it doesn't show up in `tools/list` at all.
+- **Action level (call time):** within a registered tool, a denied action returns `{"error": "permission denied: <group>:<action>"}`. The tool can't partially hide its own description, so the agent learns the boundary from the error.
+
+Legacy entries using pre-consolidation tool names (`browser_navigate`, `file_read`) are auto-normalized to bare action names at load, with a deprecation warning in the server log.
 
 ### Disabling Whole Tool Groups at Startup
 
@@ -228,7 +235,7 @@ agent = Agent(
 1. Add an **MCP Client Tool** node to your workflow
 2. Set the URL to `http://YOUR_IP:8080/sse`
 3. Add a custom header: `Authorization: Bearer YOUR_TOKEN_HERE`
-4. The node auto-discovers all 39 tools
+4. The node auto-discovers all 4 tools (39 actions)
 
 ### OpenClaw
 

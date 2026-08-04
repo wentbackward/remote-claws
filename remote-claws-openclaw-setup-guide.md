@@ -94,7 +94,7 @@ Restart the gateway:
 openclaw gateway restart
 ```
 
-The agent will have access to all 39 Remote Claws tools on the next turn.
+The agent will have access to the 4 Remote Claws tools (39 actions) on the next turn.
 
 ---
 
