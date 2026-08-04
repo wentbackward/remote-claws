@@ -200,7 +200,7 @@ remote machine's hostname.
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `mcp probe` succeeds but agent calls fail | Stale cached MCP runtime | `openclaw mcp reload` — mandatory after any config/token change |
-| `404` with `"Session not found"` after a server restart | Stale MCP session id in the cached runtime (sessions are in server memory) | Fixed server-side in v1.2.5 (stateless MCP sessions — restarts are transparent). On older versions: `openclaw mcp reload` |
+| `404` with `"Session not found"` after a server restart | Stale MCP session id in the cached runtime (sessions are in server memory) | Fixed server-side in v1.2.6 (stateless MCP sessions — restarts are transparent). On older versions: `openclaw mcp reload` |
 | `421 Misdirected Request` | `allowed_hosts` not set | Add `"allowed_hosts": "*"` to `remote-claws.json`, restart |
 | `401 Unauthorized` | Wrong or missing bearer token | Check the token in `openclaw.json` matches what `remote-claws-setup` printed; run `openclaw mcp reload` after fixing |
 | `403 Forbidden` | IP not in allowlist | Add OpenClaw server's IP to `allowed_ips`, or remove the setting to disable IP filtering |

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -107,19 +108,27 @@ def _build_permissions() -> tuple[AppConfig, PermissionChecker]:
 _CONFIG, _PERMISSIONS = _build_permissions()
 
 
-@asynccontextmanager
-async def app_lifespan(server: FastMCP):
-    config = _CONFIG
-    permissions = _PERMISSIONS
-    processes: dict = {}
+def _build_app_context() -> AppContext:
+    """Build the process-level application context exactly once.
 
+    Our state is process-scoped by design — one browser context, one exec
+    process table — regardless of how many MCP sessions or requests the
+    server handles. This matters because the MCP lifespan runs MORE than
+    once per process: in stateless streamable-HTTP mode it runs per request,
+    and in stateful/SSE modes it runs per client session. Building fresh
+    state per run would wipe the process table on every call and let two
+    sessions fight over the same Chrome profile lock.
+
+    main() calls this eagerly before serving so environment problems (e.g.
+    browser preflight) fail at boot, not on first tool call.
+    """
     browser = None
-    if permissions.is_group_active("browser"):
+    if _PERMISSIONS.is_group_active("browser"):
         # Local import: avoid pulling Playwright into memory when the browser
         # group is disabled.
         from remote_claws.browser.manager import BrowserManager, BrowserStartupError
 
-        browser = BrowserManager(config)
+        browser = BrowserManager(_CONFIG)
         # Validate the browser environment before we start serving. The
         # server is purposefully manually-run and non-daemon, so a hard
         # failure here is the right behaviour: the operator sees the error
@@ -135,32 +144,61 @@ async def app_lifespan(server: FastMCP):
         # in the shell session) is then obvious the moment the server starts.
         logger.info(
             "Browser config: channel=%s, profile=%s, headless=%s, stealth=%s",
-            config.browser_channel,
+            _CONFIG.browser_channel,
             browser.profile_dir,
-            config.browser_headless,
-            config.browser_stealth,
+            _CONFIG.browser_headless,
+            _CONFIG.browser_stealth,
         )
 
-    logger.info("RemoteClaws starting up (host=%s, port=%s)", config.host, config.port)
-    try:
-        yield AppContext(
-            config=config,
-            browser=browser,
-            permissions=permissions,
-            processes=processes,
-        )
-    finally:
-        # Kill tracked processes
-        for proc_info in processes.values():
-            proc = proc_info.get("process")
-            if proc and proc.returncode is None:
-                from contextlib import suppress
+    logger.info("RemoteClaws starting up (host=%s, port=%s)", _CONFIG.host, _CONFIG.port)
+    return AppContext(
+        config=_CONFIG,
+        browser=browser,
+        permissions=_PERMISSIONS,
+        processes={},
+    )
 
-                with suppress(Exception):
-                    proc.kill()
-        if browser is not None:
-            await browser.shutdown()
-        logger.info("RemoteClaws shut down")
+
+# Process-level singleton, built eagerly by main(). The lock is created lazily
+# because asyncio primitives bind to the running loop on first use.
+_APP_CONTEXT: AppContext | None = None
+_BUILD_LOCK: asyncio.Lock | None = None
+
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP):
+    """Yield the process-level AppContext singleton.
+
+    Runs per request (stateless streamable-HTTP) or per session (stateful /
+    SSE) depending on transport, so it must be cheap after first build and
+    must NOT tear down on exit — teardown belongs to process shutdown and is
+    handled by _RunOnShutdown in main().
+    """
+    global _APP_CONTEXT, _BUILD_LOCK
+    if _APP_CONTEXT is None:
+        if _BUILD_LOCK is None:
+            _BUILD_LOCK = asyncio.Lock()
+        async with _BUILD_LOCK:
+            if _APP_CONTEXT is None:
+                _APP_CONTEXT = _build_app_context()
+    yield _APP_CONTEXT
+
+
+async def _shutdown_app_context() -> None:
+    """Process-exit teardown: kill tracked exec processes, close the browser."""
+    from contextlib import suppress
+
+    app = _APP_CONTEXT
+    if app is None:
+        return
+    for proc_info in app.processes.values():
+        proc = proc_info.get("process")
+        if proc and proc.returncode is None:
+            with suppress(Exception):
+                proc.kill()
+    if app.browser is not None:
+        await app.browser.shutdown()
+    logger.info("RemoteClaws shut down")
 
 
 SERVER_INSTRUCTIONS = """\
@@ -256,7 +294,6 @@ logger.info(
 
 def main():
     import argparse
-    import asyncio
     import uvicorn
     from starlette.requests import Request
     from starlette.responses import JSONResponse
@@ -295,6 +332,33 @@ def main():
         sys.exit(1)
 
     verifier = HashedTokenVerifier(token_hash)
+
+    # Build the process-level app context eagerly so configuration problems
+    # (e.g. browser preflight failures) abort startup here, before we begin
+    # serving — not on the first tool call an agent makes.
+    global _APP_CONTEXT
+    _APP_CONTEXT = _build_app_context()
+
+    # ASGI wrapper that runs app-context teardown after the wrapped app has
+    # completed its own shutdown. The MCP lifespan cannot own teardown: in
+    # stateless streamable-HTTP mode it runs per request, so its exit would
+    # kill tracked processes and the browser after every call.
+    class _RunOnShutdown:
+        def __init__(self, app: ASGIApp, teardown) -> None:
+            self.app = app
+            self._teardown = teardown
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "lifespan":
+                await self.app(scope, receive, send)
+                return
+
+            async def send_wrapper(message):
+                if message["type"] == "lifespan.shutdown.complete":
+                    await self._teardown()
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
 
     # Bearer token middleware
     class BearerTokenMiddleware:
@@ -448,8 +512,11 @@ def main():
 
     logger.info("Auth enabled — bearer token required for all connections")
 
+    # Outermost wrapper: runs app-context teardown after the app shuts down.
+    final_app = _RunOnShutdown(starlette_app, _shutdown_app_context)
+
     uvicorn_config = uvicorn.Config(
-        starlette_app,
+        final_app,
         host=config.host,
         port=config.port,
         log_level="info",
