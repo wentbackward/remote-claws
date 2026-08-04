@@ -9,7 +9,11 @@ try {
         python -m venv .venv
         .venv\Scripts\Activate.ps1
         pip install -e .
-        playwright install chromium
+        # Only download the bundled Chromium when the config asks for it —
+        # the default channel=chrome drives the system Chrome instead.
+        if ($env:REMOTE_CLAWS_BROWSER_CHANNEL -eq "chromium") {
+            playwright install chromium
+        }
     } else {
         .venv\Scripts\Activate.ps1
     }

@@ -31,7 +31,7 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # Linux/macOS
 pip install -e .
-playwright install chromium  # bundled test build, used as a fallback
+playwright install chromium  # optional — only needed for browser_channel=chromium / CI; channel=chrome (default) drives system Chrome
 ```
 
 ### 1. Generate Auth Token

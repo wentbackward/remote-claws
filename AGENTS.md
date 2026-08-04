@@ -12,7 +12,7 @@ Remote Claws is an MCP (Model Context Protocol) server for remote machine contro
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e .
-playwright install chromium
+playwright install chromium  # optional — only for browser_channel=chromium / CI
 remote-claws-setup            # generates auth token, picks transport (SSE or Streamable HTTP)
 remote-claws                  # starts server on 0.0.0.0:8080
 ```
