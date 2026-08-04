@@ -1,10 +1,12 @@
 [project]
 name = "remote-claws"
-version = "1.2.2"
+version = "1.2.3"
 description = "MCP server for remote machine control — browser, desktop, exec, and file transfer"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp[cli]>=1.20",
+    # mcp 2.0 (released 2026-08) removed mcp.server.fastmcp and restructured
+    # the server API. Pinned below 2.0 until the codebase is ported.
+    "mcp[cli]>=1.20,<2.0",
     "playwright>=1.40",
     "tf-playwright-stealth>=1.1",  # detection-evasion patches applied per-page
     "pyautogui>=0.9.54",
