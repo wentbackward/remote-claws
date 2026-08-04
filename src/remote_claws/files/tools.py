@@ -32,13 +32,15 @@ def h_read(app: Any, path: str, offset: int = 0, limit: int = 0) -> str:
             f.seek(offset)
         data = f.read(limit) if limit > 0 else f.read()
 
-    return json.dumps({
-        "path": str(p.resolve()),
-        "size": file_size,
-        "offset": offset,
-        "bytes_read": len(data),
-        "content_base64": base64.b64encode(data).decode(),
-    })
+    return json.dumps(
+        {
+            "path": str(p.resolve()),
+            "size": file_size,
+            "offset": offset,
+            "bytes_read": len(data),
+            "content_base64": base64.b64encode(data).decode(),
+        }
+    )
 
 
 def h_list(app: Any, path: str = ".", pattern: str = "*", recursive: bool = False) -> str:
@@ -52,12 +54,14 @@ def h_list(app: Any, path: str = ".", pattern: str = "*", recursive: bool = Fals
     for entry in entries[:500]:  # cap results
         try:
             stat = entry.stat()
-            results.append({
-                "path": str(entry),
-                "is_dir": entry.is_dir(),
-                "size": stat.st_size if not entry.is_dir() else None,
-                "modified": stat.st_mtime,
-            })
+            results.append(
+                {
+                    "path": str(entry),
+                    "is_dir": entry.is_dir(),
+                    "size": stat.st_size if not entry.is_dir() else None,
+                    "modified": stat.st_mtime,
+                }
+            )
         except OSError:
             continue
     return json.dumps(results, indent=2)
@@ -92,14 +96,16 @@ def h_info(app: Any, path: str) -> str:
         return json.dumps({"exists": False, "path": path})
 
     stat = p.stat()
-    return json.dumps({
-        "exists": True,
-        "path": str(p.resolve()),
-        "is_dir": p.is_dir(),
-        "size": stat.st_size,
-        "modified": stat.st_mtime,
-        "created": stat.st_ctime,
-    })
+    return json.dumps(
+        {
+            "exists": True,
+            "path": str(p.resolve()),
+            "is_dir": p.is_dir(),
+            "size": stat.st_size,
+            "modified": stat.st_mtime,
+            "created": stat.st_ctime,
+        }
+    )
 
 
 HANDLERS: dict[str, Handler] = {
@@ -131,25 +137,25 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
     ) -> str:
         """Read and write files on the REMOTE machine. Binary content is base64-encoded.
 
-Actions (params not listed for an action are ignored):
+        Actions (params not listed for an action are ignored):
 
-  read path=<path> [offset=0] [limit=0]
-      Return file content as {path, size, offset, bytes_read, content_base64}.
-      limit=0 reads the whole file; use offset/limit to chunk large files.
-  write path=<path> content_base64=<b64> [make_dirs=true]
-      Write decoded bytes to path; creates parent dirs when make_dirs.
-  list [path=.] [pattern=*] [recursive=false]
-      Glob listing with {path, is_dir, size, modified}. Capped at 500 entries.
-  delete path=<path>
-      Delete a file or EMPTY directory.
-  move src=<path> dst=<path>
-      Move/rename; creates destination parent dirs.
-  info path=<path>
-      {exists, is_dir, size, modified, created}.
+          read path=<path> [offset=0] [limit=0]
+              Return file content as {path, size, offset, bytes_read, content_base64}.
+              limit=0 reads the whole file; use offset/limit to chunk large files.
+          write path=<path> content_base64=<b64> [make_dirs=true]
+              Write decoded bytes to path; creates parent dirs when make_dirs.
+          list [path=.] [pattern=*] [recursive=false]
+              Glob listing with {path, is_dir, size, modified}. Capped at 500 entries.
+          delete path=<path>
+              Delete a file or EMPTY directory.
+          move src=<path> dst=<path>
+              Move/rename; creates destination parent dirs.
+          info path=<path>
+              {exists, is_dir, size, modified, created}.
 
-Unknown actions return the valid action list. Denied actions return a
-permission error — do not retry them.
-"""
+        Unknown actions return the valid action list. Denied actions return a
+        permission error — do not retry them.
+        """
         app = ctx.request_context.lifespan_context
         return await run_action(
             group="files",

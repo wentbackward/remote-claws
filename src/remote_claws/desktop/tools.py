@@ -14,14 +14,11 @@ from remote_claws.screenshot import downscale_and_encode, make_save_path
 def h_screenshot(app: Any, region: list[int] | None = None, save_to_disk: bool = False) -> Image:
     import pyautogui
 
-    if region and len(region) == 4:
-        pil_img = pyautogui.screenshot(region=tuple(region))
-    else:
-        pil_img = pyautogui.screenshot()
+    pil_img = pyautogui.screenshot(region=tuple(region)) if region and len(region) == 4 else pyautogui.screenshot()
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG")
     save_path = make_save_path(app.config.screenshot_dir) if save_to_disk else None
-    jpeg_bytes, saved = downscale_and_encode(
+    jpeg_bytes, _saved = downscale_and_encode(
         buf.getvalue(),
         max_width=app.config.screenshot_max_width,
         max_height=app.config.screenshot_max_height,
@@ -45,9 +42,7 @@ def h_mouse_move(app: Any, x: int, y: int, duration: float = 0.2) -> str:
     return f"Moved mouse to ({x}, {y})"
 
 
-def h_mouse_drag(
-    app: Any, start_x: int, start_y: int, end_x: int, end_y: int, duration: float = 0.5
-) -> str:
+def h_mouse_drag(app: Any, start_x: int, start_y: int, end_x: int, end_y: int, duration: float = 0.5) -> str:
     import pyautogui
 
     pyautogui.moveTo(start_x, start_y)
@@ -104,16 +99,18 @@ def h_find_window(app: Any, title: str = "", class_name: str = "") -> str:
             continue
         if class_name and class_name.lower() not in win_class.lower():
             continue
-        results.append({
-            "title": win_title,
-            "class_name": win_class,
-            "rectangle": {
-                "left": win.rectangle().left,
-                "top": win.rectangle().top,
-                "right": win.rectangle().right,
-                "bottom": win.rectangle().bottom,
-            },
-        })
+        results.append(
+            {
+                "title": win_title,
+                "class_name": win_class,
+                "rectangle": {
+                    "left": win.rectangle().left,
+                    "top": win.rectangle().top,
+                    "right": win.rectangle().right,
+                    "bottom": win.rectangle().bottom,
+                },
+            }
+        )
     return json.dumps(results, indent=2)
 
 
@@ -125,9 +122,7 @@ def h_focus_window(app: Any, title: str) -> str:
     return f"Focused window: {win.window_text()}"
 
 
-def h_list_elements(
-    app: Any, window_title: str, control_type: str = "", max_depth: int = 4
-) -> str:
+def h_list_elements(app: Any, window_title: str, control_type: str = "", max_depth: int = 4) -> str:
     target = _find_window(window_title)
     if target is None:
         return f"No window found matching: {window_title}"
@@ -137,17 +132,17 @@ def h_list_elements(
         ct = child.element_info.control_type
         if control_type and ct != control_type:
             continue
-        elements.append({
-            "name": child.element_info.name,
-            "control_type": ct,
-            "automation_id": child.element_info.automation_id,
-        })
+        elements.append(
+            {
+                "name": child.element_info.name,
+                "control_type": ct,
+                "automation_id": child.element_info.automation_id,
+            }
+        )
     return json.dumps(elements[:200], indent=2)  # cap at 200
 
 
-def h_click_element(
-    app: Any, window_title: str, element_name: str, control_type: str = ""
-) -> str:
+def h_click_element(app: Any, window_title: str, element_name: str, control_type: str = "") -> str:
     target = _find_window(window_title)
     if target is None:
         return f"No window found matching: {window_title}"
@@ -162,9 +157,7 @@ def h_click_element(
     return f"Element not found: {element_name}"
 
 
-def h_get_element_text(
-    app: Any, window_title: str, element_name: str, control_type: str = ""
-) -> str:
+def h_get_element_text(app: Any, window_title: str, element_name: str, control_type: str = "") -> str:
     target = _find_window(window_title)
     if target is None:
         return f"No window found matching: {window_title}"
@@ -231,41 +224,41 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         ctx: Context = None,
     ) -> Any:
         """Control the REMOTE machine's desktop: mouse, keyboard, screenshots, and
-Windows UI automation. Coordinates are absolute screen pixels. Returns text for
-most actions, a JPEG image for screenshot. Moving the mouse to (0,0) aborts
-(pyautogui failsafe).
+        Windows UI automation. Coordinates are absolute screen pixels. Returns text for
+        most actions, a JPEG image for screenshot. Moving the mouse to (0,0) aborts
+        (pyautogui failsafe).
 
-Workflow: screenshot first, act, re-screenshot to verify. Prefer element-name
-actions over coordinates when possible — coordinates break when windows move.
+        Workflow: screenshot first, act, re-screenshot to verify. Prefer element-name
+        actions over coordinates when possible — coordinates break when windows move.
 
-Actions (params not listed for an action are ignored):
+        Actions (params not listed for an action are ignored):
 
-Capture
-  screenshot [region=[x,y,w,h]] [save_to_disk=false]
-      JPEG of the full screen or a region.
+        Capture
+          screenshot [region=[x,y,w,h]] [save_to_disk=false]
+              JPEG of the full screen or a region.
 
-Mouse
-  mouse_click x=<px> y=<px> [button=left] [clicks=1]      clicks=2 = double-click
-  mouse_move x=<px> y=<px> [duration=0.2]
-  mouse_drag start_x=<px> start_y=<px> end_x=<px> end_y=<px> [duration=0.5]
-  scroll x=<px> y=<px> [clicks=3] [direction=down]        direction: up | down
+        Mouse
+          mouse_click x=<px> y=<px> [button=left] [clicks=1]      clicks=2 = double-click
+          mouse_move x=<px> y=<px> [duration=0.2]
+          mouse_drag start_x=<px> start_y=<px> end_x=<px> end_y=<px> [duration=0.5]
+          scroll x=<px> y=<px> [clicks=3] [direction=down]        direction: up | down
 
-Keyboard (acts at current focus)
-  type_text text=<text> [interval=0.02]   ASCII only.
-  press_key keys=<combo>                  "enter", "ctrl+c", "alt+tab", "win"
+        Keyboard (acts at current focus)
+          type_text text=<text> [interval=0.02]   ASCII only.
+          press_key keys=<combo>                  "enter", "ctrl+c", "alt+tab", "win"
 
-Windows UI automation (targets controls by NAME — resolution-independent)
-  find_window [title=<substr>] [class_name=<substr>]
-      List visible windows with title, class, rectangle.
-  focus_window title=<substr>             Bring matching window to foreground.
-  list_elements window_title=<substr> [control_type=<type>] [max_depth=4]
-      Enumerate controls (Button, Edit, ...) with name/automation_id. Cap 200.
-  click_element window_title=<substr> element_name=<name> [control_type=<type>]
-  get_element_text window_title=<substr> element_name=<name> [control_type=<type>]
+        Windows UI automation (targets controls by NAME — resolution-independent)
+          find_window [title=<substr>] [class_name=<substr>]
+              List visible windows with title, class, rectangle.
+          focus_window title=<substr>             Bring matching window to foreground.
+          list_elements window_title=<substr> [control_type=<type>] [max_depth=4]
+              Enumerate controls (Button, Edit, ...) with name/automation_id. Cap 200.
+          click_element window_title=<substr> element_name=<name> [control_type=<type>]
+          get_element_text window_title=<substr> element_name=<name> [control_type=<type>]
 
-Unknown actions return the valid action list. Denied actions return a
-permission error — do not retry them.
-"""
+        Unknown actions return the valid action list. Denied actions return a
+        permission error — do not retry them.
+        """
         app = ctx.request_context.lifespan_context
         return await run_action(
             group="desktop",

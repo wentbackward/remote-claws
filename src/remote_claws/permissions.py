@@ -64,11 +64,12 @@ class PermissionChecker:
                 normalized = []
                 for entry in entries:
                     if entry != "*" and entry.startswith(prefix):
-                        stripped = entry[len(prefix):]
+                        stripped = entry[len(prefix) :]
                         logger.warning(
-                            "permissions.json: legacy entry %r in group %r — "
-                            "rename to the bare action name %r",
-                            entry, group, stripped,
+                            "permissions.json: legacy entry %r in group %r — rename to the bare action name %r",
+                            entry,
+                            group,
+                            stripped,
                         )
                         entry = stripped
                     normalized.append(entry)

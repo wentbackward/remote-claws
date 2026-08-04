@@ -76,11 +76,14 @@ def test_disabled_group_denied_even_when_allowed(tmp_path):
 def test_legacy_tool_names_normalized(tmp_path):
     """Old-style entries (browser_navigate, exec_run, file_read) keep working."""
     checker = PermissionChecker(
-        _write(tmp_path, {
-            "browser": {"allow": ["browser_navigate"]},
-            "exec": {"allow": ["*"], "deny": ["exec_kill"]},
-            "files": {"allow": ["file_read"]},
-        }),
+        _write(
+            tmp_path,
+            {
+                "browser": {"allow": ["browser_navigate"]},
+                "exec": {"allow": ["*"], "deny": ["exec_kill"]},
+                "files": {"allow": ["file_read"]},
+            },
+        ),
         enabled_groups=["browser", "exec", "files"],
     )
     assert checker.is_action_allowed("browser", "navigate") is True

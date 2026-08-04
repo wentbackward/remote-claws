@@ -1,7 +1,5 @@
 """Shared test fixtures."""
 
-import json
-
 import pytest
 
 
@@ -19,19 +17,3 @@ def _isolated_env(monkeypatch):
     # developer's local remote-claws.json in the repo root cannot leak into
     # test runs and silently flip defaults (e.g. transport).
     monkeypatch.setenv("REMOTE_CLAWS_CONFIG_FILE", "__nonexistent__.json")
-
-
-@pytest.fixture
-def tmp_workspace(tmp_path):
-    """Create a temporary workspace with a permissions.json and auth file."""
-    perms = tmp_path / "permissions.json"
-    perms.write_text(json.dumps({"browser_navigate": "allow", "exec_run": "deny"}))
-    auth = tmp_path / ".remote-claws-auth.json"
-    auth.write_text(json.dumps({"token_hash": "fake_hash_for_testing"}))
-    return tmp_path
-
-
-@pytest.fixture
-def sample_token():
-    """A deterministic test token (not cryptographically secure, just for tests)."""
-    return "a" * 64

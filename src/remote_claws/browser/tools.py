@@ -82,7 +82,7 @@ async def h_screenshot(
     else:
         raw = await page.screenshot(full_page=full_page)
     save_path = make_save_path(app.config.screenshot_dir) if save_to_disk else None
-    jpeg_bytes, saved = downscale_and_encode(
+    jpeg_bytes, _saved = downscale_and_encode(
         raw,
         max_width=app.config.screenshot_max_width,
         max_height=app.config.screenshot_max_height,
@@ -187,52 +187,52 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         ctx: Context = None,
     ) -> Any:
         """Control the web browser on the REMOTE machine (persistent system Chrome via
-Playwright). All selectors are CSS selectors. The browser is stateful: pages,
-tabs, cookies and logins persist between calls. Returns text (JSON) for most
-actions, a JPEG image for screenshot.
+        Playwright). All selectors are CSS selectors. The browser is stateful: pages,
+        tabs, cookies and logins persist between calls. Returns text (JSON) for most
+        actions, a JPEG image for screenshot.
 
-Actions (params not listed for an action are ignored):
+        Actions (params not listed for an action are ignored):
 
-Navigation
-  navigate url=<url> [wait_until=load] [settle_ms=0] [timeout=30000]
-      Go to a URL. wait_until: commit | domcontentloaded | load | networkidle.
-      settle_ms: extra pause after load (SPA hydration, anti-bot interstitials).
-      Returns final URL, title, HTTP status.
-  go_back | go_forward      Move through tab history. No params.
+        Navigation
+          navigate url=<url> [wait_until=load] [settle_ms=0] [timeout=30000]
+              Go to a URL. wait_until: commit | domcontentloaded | load | networkidle.
+              settle_ms: extra pause after load (SPA hydration, anti-bot interstitials).
+              Returns final URL, title, HTTP status.
+          go_back | go_forward      Move through tab history. No params.
 
-Interaction
-  click selector=<css> [button=left] [click_count=1]
-      Click an element. click_count=2 for double-click.
-  fill selector=<css> value=<text>
-      Set input/textarea value: clears first, fires change events, Unicode-safe.
-  type selector=<css> text=<text> [delay=0]
-      Type keystroke-by-keystroke (appends, does NOT clear). delay in ms/key.
-      To select all before replacing: press_key key="Control+a" first.
-  press_key key=<key>       One key or combo: "Enter", "Escape", "Tab", "Control+a".
-  select_option selector=<css> value=<value-or-label>
-      Choose a <select> option.
+        Interaction
+          click selector=<css> [button=left] [click_count=1]
+              Click an element. click_count=2 for double-click.
+          fill selector=<css> value=<text>
+              Set input/textarea value: clears first, fires change events, Unicode-safe.
+          type selector=<css> text=<text> [delay=0]
+              Type keystroke-by-keystroke (appends, does NOT clear). delay in ms/key.
+              To select all before replacing: press_key key="Control+a" first.
+          press_key key=<key>       One key or combo: "Enter", "Escape", "Tab", "Control+a".
+          select_option selector=<css> value=<value-or-label>
+              Choose a <select> option.
 
-Reading
-  get_text [selector=body]  Visible inner text of an element.
-  get_html [selector=html] [outer=true]
-      HTML markup; outer=false for innerHTML only.
-  eval_js expression=<js>   Run JavaScript in the page; JSON-serialized result.
-      Use this to clear a field without typing, read computed state, etc.
+        Reading
+          get_text [selector=body]  Visible inner text of an element.
+          get_html [selector=html] [outer=true]
+              HTML markup; outer=false for innerHTML only.
+          eval_js expression=<js>   Run JavaScript in the page; JSON-serialized result.
+              Use this to clear a field without typing, read computed state, etc.
 
-Waiting & capture
-  wait_for selector=<css> [state=visible] [timeout=10000]
-      Block until the element reaches state: visible | hidden | attached | detached.
-  screenshot [selector=<css>] [full_page=false] [save_to_disk=false]
-      JPEG of viewport, full page, or one element.
+        Waiting & capture
+          wait_for selector=<css> [state=visible] [timeout=10000]
+              Block until the element reaches state: visible | hidden | attached | detached.
+          screenshot [selector=<css>] [full_page=false] [save_to_disk=false]
+              JPEG of viewport, full page, or one element.
 
-Tabs
-  tabs_list                 All open tabs (index, url, title).
-  tab_new [url=about:blank] Open a tab (becomes active).
-  tab_close [index=-1]      Close a tab (-1 = current).
+        Tabs
+          tabs_list                 All open tabs (index, url, title).
+          tab_new [url=about:blank] Open a tab (becomes active).
+          tab_close [index=-1]      Close a tab (-1 = current).
 
-Unknown actions return the valid action list. Denied actions return a
-permission error — do not retry them.
-"""
+        Unknown actions return the valid action list. Denied actions return a
+        permission error — do not retry them.
+        """
         app = ctx.request_context.lifespan_context
         return await run_action(
             group="browser",

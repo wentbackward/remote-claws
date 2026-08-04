@@ -16,12 +16,22 @@ class _AllowAll:
 
 
 async def _call(action: str, **params):
-    full = {"path": "", "content_base64": "", "make_dirs": True, "offset": 0,
-            "limit": 0, "pattern": "*", "recursive": False, "src": "", "dst": ""}
+    full = {
+        "path": "",
+        "content_base64": "",
+        "make_dirs": True,
+        "offset": 0,
+        "limit": 0,
+        "pattern": "*",
+        "recursive": False,
+        "src": "",
+        "dst": "",
+    }
     full.update(params)
     # files handlers ignore app; SimpleNamespace documents that explicitly
-    return await run_action(group="files", handlers=HANDLERS, action=action,
-                            app=SimpleNamespace(), params=full, permissions=_AllowAll())
+    return await run_action(
+        group="files", handlers=HANDLERS, action=action, app=SimpleNamespace(), params=full, permissions=_AllowAll()
+    )
 
 
 @pytest.mark.asyncio

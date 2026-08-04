@@ -35,8 +35,12 @@ _HANDLERS = {"ping": _h_ping, "greet": _h_greet, "async_": _h_async}
 @pytest.mark.asyncio
 async def test_routes_to_sync_handler():
     result = await run_action(
-        group="g", handlers=_HANDLERS, action="ping",
-        app=None, params={}, permissions=_AllowAll(),
+        group="g",
+        handlers=_HANDLERS,
+        action="ping",
+        app=None,
+        params={},
+        permissions=_AllowAll(),
     )
     assert result == "pong"
 
@@ -44,8 +48,11 @@ async def test_routes_to_sync_handler():
 @pytest.mark.asyncio
 async def test_routes_to_async_handler_and_filters_params():
     result = await run_action(
-        group="g", handlers=_HANDLERS, action="async_",
-        app=None, params={"value": "x", "unrelated": "ignored"},
+        group="g",
+        handlers=_HANDLERS,
+        action="async_",
+        app=None,
+        params={"value": "x", "unrelated": "ignored"},
         permissions=_AllowAll(),
     )
     assert result == "async:x"
@@ -54,8 +61,12 @@ async def test_routes_to_async_handler_and_filters_params():
 @pytest.mark.asyncio
 async def test_unknown_action_returns_valid_list():
     result = await run_action(
-        group="g", handlers=_HANDLERS, action="nope",
-        app=None, params={}, permissions=_AllowAll(),
+        group="g",
+        handlers=_HANDLERS,
+        action="nope",
+        app=None,
+        params={},
+        permissions=_AllowAll(),
     )
     data = json.loads(result)
     assert "unknown action" in data["error"]
@@ -65,8 +76,12 @@ async def test_unknown_action_returns_valid_list():
 @pytest.mark.asyncio
 async def test_denied_action_returns_error_string():
     result = await run_action(
-        group="browser", handlers=_HANDLERS, action="ping",
-        app=None, params={}, permissions=_DenyAll(),
+        group="browser",
+        handlers=_HANDLERS,
+        action="ping",
+        app=None,
+        params={},
+        permissions=_DenyAll(),
     )
     assert json.loads(result)["error"] == "permission denied: browser:ping"
 
@@ -75,8 +90,12 @@ async def test_denied_action_returns_error_string():
 async def test_missing_required_param_rejected():
     for bad in ({}, {"name": ""}, {"name": None}):
         result = await run_action(
-            group="g", handlers=_HANDLERS, action="greet",
-            app=None, params=bad, permissions=_AllowAll(),
+            group="g",
+            handlers=_HANDLERS,
+            action="greet",
+            app=None,
+            params=bad,
+            permissions=_AllowAll(),
         )
         assert "requires params: name" in json.loads(result)["error"]
 
@@ -90,8 +109,12 @@ async def test_app_is_injected():
         return "ok"
 
     await run_action(
-        group="g", handlers={"cap": h_capture}, action="cap",
-        app="SENTINEL", params={}, permissions=_AllowAll(),
+        group="g",
+        handlers={"cap": h_capture},
+        action="cap",
+        app="SENTINEL",
+        params={},
+        permissions=_AllowAll(),
     )
     assert seen["app"] == "SENTINEL"
 
@@ -104,7 +127,11 @@ async def test_non_string_result_passes_through_untouched():
         return sentinel
 
     result = await run_action(
-        group="g", handlers={"obj": h_obj}, action="obj",
-        app=None, params={}, permissions=_AllowAll(),
+        group="g",
+        handlers={"obj": h_obj},
+        action="obj",
+        app=None,
+        params={},
+        permissions=_AllowAll(),
     )
     assert result is sentinel

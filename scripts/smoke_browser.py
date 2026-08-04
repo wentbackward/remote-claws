@@ -35,6 +35,7 @@ Or as flags:
         --url http://192.168.1.42:8080/sse \\
         --token YOUR_TOKEN_HERE
 """
+
 from __future__ import annotations
 
 import argparse
@@ -54,8 +55,7 @@ try:
     from mcp.client.sse import sse_client
 except ImportError:
     print(
-        "ERROR: the 'mcp' package is not installed. Run:\n"
-        "    pip install \"mcp[cli]>=1.20\"",
+        "ERROR: the 'mcp' package is not installed. Run:\n    pip install \"mcp[cli]>=1.20\"",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -136,7 +136,7 @@ class Driver:
         """Call a remote_browser action, surface errors as warnings, return the raw result."""
         try:
             result = await self.session.call_tool("remote_browser", {"action": action, **arguments})
-        except Exception as exc:  # noqa: BLE001 — we want to keep going
+        except Exception as exc:
             fail(f"{action} raised {type(exc).__name__}: {exc}")
             return None
         if is_error(result):
@@ -185,7 +185,8 @@ async def run_smoke(driver: Driver) -> None:
         wait_until="load",
         settle_ms=4000,
     )
-    if nav: ok(text_of(nav).strip())
+    if nav:
+        ok(text_of(nav).strip())
 
     # Wait for either a tweet article (signed in) or the sign-in form
     # (signed out) so the script can report which it saw.
@@ -300,7 +301,8 @@ async def run_smoke(driver: Driver) -> None:
         wait_until="load",
         settle_ms=3000,
     )
-    if nav: ok(text_of(nav).strip())
+    if nav:
+        ok(text_of(nav).strip())
 
     # Pull a chunk of the article body so the operator can see what we got
     # (paywalled or not \u2014 the navigation itself is what we're verifying).
@@ -328,7 +330,9 @@ async def run_smoke(driver: Driver) -> None:
             excerpt = (info.get("excerpt") or "").strip()
             if excerpt:
                 print("        excerpt:")
-                for line in textwrap.wrap(excerpt, width=68, initial_indent="          ", subsequent_indent="          "):
+                for line in textwrap.wrap(
+                    excerpt, width=68, initial_indent="          ", subsequent_indent="          "
+                ):
                     print(line)
         except json.JSONDecodeError:
             warn("could not parse article info JSON")
@@ -341,10 +345,9 @@ async def run_smoke(driver: Driver) -> None:
 @asynccontextmanager
 async def open_session(url: str, token: str):
     headers = {"Authorization": f"Bearer {token}"}
-    async with sse_client(url, headers=headers) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            yield session
+    async with sse_client(url, headers=headers) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        yield session
 
 
 async def amain(url: str, token: str) -> int:
@@ -355,7 +358,7 @@ async def amain(url: str, token: str) -> int:
         async with open_session(url, token) as session:
             driver = Driver(session, SCREENSHOT_DIR)
             await run_smoke(driver)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         banner("CONNECTION FAILED")
         print(f"  {type(exc).__name__}: {exc}")
         print()
@@ -387,9 +390,7 @@ def main() -> None:
     ns = parser.parse_args()
 
     if not ns.url or not ns.token:
-        parser.error(
-            "both --url and --token (or REMOTE_CLAWS_URL / REMOTE_CLAWS_TOKEN) are required"
-        )
+        parser.error("both --url and --token (or REMOTE_CLAWS_URL / REMOTE_CLAWS_TOKEN) are required")
 
     sys.exit(asyncio.run(amain(ns.url, ns.token)))
 

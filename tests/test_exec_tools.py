@@ -21,17 +21,32 @@ def app():
 
 
 async def _call(app, action: str, **params):
-    full = {"command": "", "args": None, "cwd": None, "timeout": 0, "shell": False,
-            "process_id": "", "wait": False, "input_text": ""}
+    full = {
+        "command": "",
+        "args": None,
+        "cwd": None,
+        "timeout": 0,
+        "shell": False,
+        "process_id": "",
+        "wait": False,
+        "input_text": "",
+    }
     full.update(params)
-    return await run_action(group="exec", handlers=HANDLERS, action=action,
-                            app=app, params=full, permissions=_AllowAll())
+    return await run_action(
+        group="exec", handlers=HANDLERS, action=action, app=app, params=full, permissions=_AllowAll()
+    )
 
 
 @pytest.mark.asyncio
 async def test_run_and_get_output(app):
-    started = json.loads(await _call(app, "run", command=sys.executable,
-                                     args=["-c", "print('hello'); import sys; print('oops', file=sys.stderr)"]))
+    started = json.loads(
+        await _call(
+            app,
+            "run",
+            command=sys.executable,
+            args=["-c", "print('hello'); import sys; print('oops', file=sys.stderr)"],
+        )
+    )
     proc_id = started["process_id"]
     assert started["status"] == "running"
 
@@ -53,8 +68,9 @@ async def test_list_shows_tracked_process(app):
 
 @pytest.mark.asyncio
 async def test_send_input_roundtrip(app):
-    started = json.loads(await _call(app, "run", command=sys.executable,
-                                     args=["-c", "line = input(); print(f'got:{line}')"]))
+    started = json.loads(
+        await _call(app, "run", command=sys.executable, args=["-c", "line = input(); print(f'got:{line}')"])
+    )
     proc_id = started["process_id"]
     sent = json.loads(await _call(app, "send_input", process_id=proc_id, input_text="ping"))
     assert sent["status"] == "input sent"
@@ -64,8 +80,7 @@ async def test_send_input_roundtrip(app):
 
 @pytest.mark.asyncio
 async def test_kill_running_process(app):
-    started = json.loads(await _call(app, "run", command=sys.executable,
-                                     args=["-c", "import time; time.sleep(60)"]))
+    started = json.loads(await _call(app, "run", command=sys.executable, args=["-c", "import time; time.sleep(60)"]))
     proc_id = started["process_id"]
     killed = json.loads(await _call(app, "kill", process_id=proc_id))
     assert killed["status"] == "killed"

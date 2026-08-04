@@ -87,7 +87,7 @@ class AppContext:
     # registered, so no tool will ever observe browser=None.
     browser: object | None
     permissions: PermissionChecker
-    processes: dict  # exec_run process tracker
+    processes: dict  # remote_exec process tracker
 
 
 def _build_permissions() -> tuple[AppConfig, PermissionChecker]:
@@ -325,8 +325,11 @@ def main():
                 logger.warning(
                     "AUTH FAILURE — ip=%s method=%s path=%s — "
                     "header does not start with 'Bearer '. Got prefix=%r (length=%d)",
-                    client_ip, method, path,
-                    preview, len(auth_header),
+                    client_ip,
+                    method,
+                    path,
+                    preview,
+                    len(auth_header),
                 )
                 response = JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
                 await response(scope, receive, send)
@@ -358,8 +361,13 @@ def main():
                 logger.warning(
                     "AUTH FAILURE — ip=%s method=%s path=%s — "
                     "token did not match. head=%r tail=%r length=%d expected=%d%s",
-                    client_ip, method, path,
-                    head, tail, len(token), EXPECTED_LEN,
+                    client_ip,
+                    method,
+                    path,
+                    head,
+                    tail,
+                    len(token),
+                    EXPECTED_LEN,
                     (" [" + "; ".join(tells) + "]") if tells else "",
                 )
                 _diagnose_auth_source(raw_auth_values)

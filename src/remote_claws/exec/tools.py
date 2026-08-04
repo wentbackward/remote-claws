@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
 from typing import Any
@@ -9,6 +10,18 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from remote_claws.dispatch import Handler, run_action
 from remote_claws.permissions import PermissionChecker
+
+# Strong references to fire-and-forget background tasks (stream readers,
+# auto-kill timers). asyncio only weak-references tasks, so an unreferenced
+# task can be garbage-collected mid-run — this set keeps them alive until
+# they complete.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
 
 
 async def h_run(
@@ -57,8 +70,8 @@ async def h_run(
                 break
             buf.append(line.decode(errors="replace"))
 
-    asyncio.create_task(_read_stream(proc.stdout, stdout_buf))
-    asyncio.create_task(_read_stream(proc.stderr, stderr_buf))
+    _spawn(_read_stream(proc.stdout, stdout_buf))
+    _spawn(_read_stream(proc.stderr, stderr_buf))
 
     if timeout > 0:
 
@@ -67,7 +80,7 @@ async def h_run(
             if proc.returncode is None:
                 proc.kill()
 
-        asyncio.create_task(_auto_kill())
+        _spawn(_auto_kill())
 
     return json.dumps({"process_id": process_id, "pid": proc.pid, "status": "running"})
 
@@ -80,21 +93,21 @@ async def h_get_output(app: Any, process_id: str, wait: bool = False, timeout: i
     proc = proc_info["process"]
 
     if wait and proc.returncode is None:
-        try:
+        with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
-            pass
 
     # Small delay to let readers catch up
     await asyncio.sleep(0.1)
 
-    return json.dumps({
-        "process_id": process_id,
-        "running": proc.returncode is None,
-        "exit_code": proc.returncode,
-        "stdout": "".join(proc_info["stdout"]),
-        "stderr": "".join(proc_info["stderr"]),
-    })
+    return json.dumps(
+        {
+            "process_id": process_id,
+            "running": proc.returncode is None,
+            "exit_code": proc.returncode,
+            "stdout": "".join(proc_info["stdout"]),
+            "stderr": "".join(proc_info["stderr"]),
+        }
+    )
 
 
 async def h_send_input(app: Any, process_id: str, input_text: str) -> str:
@@ -129,14 +142,16 @@ async def h_list(app: Any) -> str:
     result = []
     for pid, info in app.processes.items():
         proc = info["process"]
-        result.append({
-            "process_id": pid,
-            "command": info["command"],
-            "args": info["args"],
-            "running": proc.returncode is None,
-            "exit_code": proc.returncode,
-            "pid": proc.pid,
-        })
+        result.append(
+            {
+                "process_id": pid,
+                "command": info["command"],
+                "args": info["args"],
+                "running": proc.returncode is None,
+                "exit_code": proc.returncode,
+                "pid": proc.pid,
+            }
+        )
     return json.dumps(result, indent=2)
 
 
@@ -166,25 +181,25 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         ctx: Context = None,
     ) -> str:
         """Run commands on the REMOTE machine. Processes are asynchronous: run returns
-a process_id immediately; poll with get_output.
+        a process_id immediately; poll with get_output.
 
-Actions (params not listed for an action are ignored):
+        Actions (params not listed for an action are ignored):
 
-  run command=<cmd> [args=["..."]] [cwd=<dir>] [timeout=0] [shell=false]
-      Start a process; returns {process_id, pid, status}. shell=true runs via the
-      system shell (pipes, redirects, builtins). timeout>0 auto-kills after N sec.
-  get_output process_id=<id> [wait=false] [timeout=30]
-      Accumulated stdout/stderr, running flag, exit code. wait=true blocks until
-      the process exits or timeout elapses.
-  send_input process_id=<id> input_text=<line>
-      Write a line to stdin (newline appended automatically).
-  kill process_id=<id>
-      Terminate a running process.
-  list
-      All tracked processes with status.
+          run command=<cmd> [args=["..."]] [cwd=<dir>] [timeout=0] [shell=false]
+              Start a process; returns {process_id, pid, status}. shell=true runs via the
+              system shell (pipes, redirects, builtins). timeout>0 auto-kills after N sec.
+          get_output process_id=<id> [wait=false] [timeout=30]
+              Accumulated stdout/stderr, running flag, exit code. wait=true blocks until
+              the process exits or timeout elapses.
+          send_input process_id=<id> input_text=<line>
+              Write a line to stdin (newline appended automatically).
+          kill process_id=<id>
+              Terminate a running process.
+          list
+              All tracked processes with status.
 
-Processes persist until killed or server shutdown — kill them when done.
-"""
+        Processes persist until killed or server shutdown — kill them when done.
+        """
         app = ctx.request_context.lifespan_context
         return await run_action(
             group="exec",
