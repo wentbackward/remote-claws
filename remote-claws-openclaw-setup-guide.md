@@ -56,13 +56,7 @@ Replace `100.106.2.100` with your OpenClaw server's Tailscale IP. See the [READM
 
 Restart Remote Claws after saving the file.
 
-### Verify connectivity from your OpenClaw server
-
-```bash
-curl -s -H "Authorization: Bearer YOUR_TOKEN" \
-  http://<WINDOWS_TAILSCALE_IP>:8080/sse --max-time 5
-# Expected: event: endpoint / data: /messages/?session_id=...
-```
+Restart Remote Claws after saving the file.
 
 ---
 
@@ -75,24 +69,54 @@ Edit `~/.openclaw/openclaw.json`. Merge carefully if the file already has conten
   "mcp": {
     "servers": {
       "remote-claws": {
-        "url": "http://<WINDOWS_TAILSCALE_IP>:8080/sse",
+        "url": "http://<WINDOWS_TAILSCALE_IP>:8080/mcp",
+        "transport": "streamable-http",
+        "enabled": true,
         "headers": {
           "Authorization": "Bearer YOUR_TOKEN_HERE"
         }
       }
     }
-  },
-  "commands": {
-    "mcp": true
   }
 }
 ```
 
-Restart the gateway:
+Use `streamable-http` — current OpenClaw supports it and it is the Remote Claws default. (SSE at `/sse` still exists for older clients; set `"transport": "sse"` in `remote-claws.json` if you need it.)
+
+### Verify the wiring — in this order
+
+```bash
+# 1. Config only — is the server enabled? right transport? No connection attempted.
+openclaw mcp status
+
+# 2. Authoritative wiring check — real connection, real auth.
+#    "N tools, resources, prompts" = server side is good.
+openclaw mcp probe remote-claws
+
+# 3. THE STEP EVERYONE MISSES — mandatory after any config or token change.
+openclaw mcp reload
+
+# 4. Ground truth — make the agent actually call a tool.
+openclaw agent --agent main \
+  -m "Call the tool remote-claws__resources_list with empty arguments and show the raw result."
+```
+
+**Why step 3 is mandatory:** the gateway caches MCP runtimes per agent. A config
+hot-reload updates the config but does *not* rebuild the cached runtime, so a
+server that failed auth once stays broken until `mcp reload` — even though
+`mcp probe` (a fresh process) reports success. That exact mismatch — probe OK,
+agent calls fail — is the signature of a stale cached runtime.
+
+If it still fails to connect after reload, restart the gateway and watch the log:
 
 ```bash
 openclaw gateway restart
+openclaw logs --follow
 ```
+
+> **Note:** you may see `/sse` errors in the Remote Claws server log during
+> connection setup. That is OpenClaw probing the legacy SSE endpoint as a
+> fallback before settling on streamable-http — safe to ignore.
 
 The agent will have access to the 4 Remote Claws tools (39 actions) on the next turn.
 
@@ -105,7 +129,13 @@ The skill file tells the agent what tools are available and when to use them. Wi
 ### Option A — Install from ClawHub
 
 ```bash
-openclaw skills install remote-claws
+openclaw skills install remote_claws
+```
+
+Then confirm the skill is loaded and its dependencies are satisfied:
+
+```bash
+openclaw skills check
 ```
 
 Or from chat:
@@ -137,16 +167,28 @@ Then:
 
 If the screenshot comes back and Notepad opens with text in it, you're fully operational.
 
+For an unambiguous end-to-end check that bypasses tool-selection reasoning entirely:
+
+```bash
+openclaw agent --agent main -m "Call remote-claws__remote_exec with the command: hostname"
+```
+
+This forces a call to the remote machine's `remote_exec` tool (note the
+`remote-claws__` prefix OpenClaw adds to MCP tool names) and should return the
+Windows machine's hostname.
+
 ---
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
+| `mcp probe` succeeds but agent calls fail | Stale cached MCP runtime | `openclaw mcp reload` — mandatory after any config/token change |
 | `421 Misdirected Request` | `allowed_hosts` not set | Add `"allowed_hosts": "*"` to `remote-claws.json`, restart |
-| `401 Unauthorized` | Wrong or missing bearer token | Check the token in `openclaw.json` matches what `remote-claws-setup` printed |
+| `401 Unauthorized` | Wrong or missing bearer token | Check the token in `openclaw.json` matches what `remote-claws-setup` printed; run `openclaw mcp reload` after fixing |
 | `403 Forbidden` | IP not in allowlist | Add OpenClaw server's IP to `allowed_ips`, or remove the setting to disable IP filtering |
+| `/sse` errors in the Remote Claws log | OpenClaw fallback-probing the legacy endpoint | Safe to ignore — it settles on streamable-http |
 | Connection refused / timeout | Remote Claws not running | Start it: `.\start.ps1` (keep the terminal open) |
-| Tools not available to agent | MCP config not loaded | Restart OpenClaw gateway |
+| Tools not available to agent | MCP config not loaded | `openclaw mcp reload`, then `openclaw gateway restart` if still missing; watch `openclaw logs --follow` |
 
 For additional troubleshooting, see the [README](README.md#troubleshooting-421-errors).

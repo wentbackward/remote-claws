@@ -2,7 +2,7 @@
 
 ## What This Server Provides
 
-Remote Claws gives an AI agent full control of a remote desktop machine — the same kind of control a human sitting at the keyboard and screen would have. It is an MCP server that exposes **4 tools covering 39 actions** over SSE/HTTP: `remote_browser`, `remote_desktop`, `remote_exec`, `remote_files`. Each tool takes an `action` parameter plus that action's params, like a CLI subcommand.
+Remote Claws gives an AI agent full control of a remote desktop machine — the same kind of control a human sitting at the keyboard and screen would have. It is an MCP server that exposes **4 tools covering 39 actions** over Streamable HTTP (legacy SSE also available): `remote_browser`, `remote_desktop`, `remote_exec`, `remote_files`. Each tool takes an `action` parameter plus that action's params, like a CLI subcommand.
 
 The `remote_` prefix is deliberate: these tools act on the **remote** machine. If the agent also has local tools named `browser`, `exec`, `read`, or `write`, those are different tools on a different machine.
 
@@ -44,7 +44,7 @@ These skills compose naturally. Examples of compound workflows:
 
 ## Connection
 
-The server runs on the target machine and listens for MCP clients over SSE/HTTP. Default endpoint: `http://<machine-ip>:8080/sse`. All tools are available to any connected agent, subject to the permission policy configured in `permissions.json`.
+The server runs on the target machine and listens for MCP clients over HTTP. Default endpoint: `http://<machine-ip>:8080/mcp` (Streamable HTTP; legacy SSE at `/sse`). All tools are available to any connected agent, subject to the permission policy configured in `permissions.json`.
 
 ## Limitations
 

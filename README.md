@@ -68,7 +68,7 @@ The server hard-fails at startup if `browser_channel=chrome` (the default) and C
 remote-claws
 ```
 
-The server runs in the **foreground** on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/sse` (SSE) or `http://<your-ip>:8080/mcp` (Streamable HTTP) with the bearer token.
+The server runs in the **foreground** on `0.0.0.0:8080` by default. Agents connect to `http://<your-ip>:8080/mcp` (Streamable HTTP, the default) or `http://<your-ip>:8080/sse` (legacy SSE) with the bearer token.
 
 ## Security
 
@@ -152,18 +152,18 @@ For production, also consider:
 
 ## Connecting Agents
 
-Remote Claws supports **two transport protocols**. Both are available on the same port:
+Remote Claws supports **two transport protocols**, one at a time (chosen at setup or via `REMOTE_CLAWS_TRANSPORT`):
 
 | Transport | Path | Clients |
 |-----------|------|---------|
-| **SSE** (legacy) | `/sse` | Claude Desktop, openclaw, most existing clients |
-| **Streamable HTTP** (MCP spec 2025-03-26+) | `/mcp` | Claude Code, newer SDKs |
+| **Streamable HTTP** (current MCP spec, **default**) | `/mcp` | openclaw, Claude Code, newer SDKs |
+| **SSE** (legacy, deprecated by the MCP spec) | `/sse` | Claude Desktop and older clients |
 
-Choose one at setup time (`remote-claws-setup` prompts). Both share the same browser tab and process tracker — reconnecting clients reattach the same session.
+`remote-claws-setup` prompts for the choice and writes it to `remote-claws.json`. To serve SSE clients, set `"transport": "sse"`. Both transports share the same browser tabs and process tracker — reconnecting clients reattach the same session.
 
 ### Claude Desktop
 
-Add to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+Claude Desktop uses the legacy SSE transport, so set `"transport": "sse"` in `remote-claws.json` first. Then add to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
@@ -188,8 +188,8 @@ Add to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json`
 
 ```bash
 claude mcp add remote-claws \
-  --transport sse \
-  --url http://YOUR_IP:8080/sse \
+  --transport http \
+  --url http://YOUR_IP:8080/mcp \
   --header "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
@@ -201,8 +201,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 async with MultiServerMCPClient(
     {
         "remote-claws": {
-            "url": "http://YOUR_IP:8080/sse",
-            "transport": "sse",
+            "url": "http://YOUR_IP:8080/mcp",
+            "transport": "streamable_http",
             "headers": {
                 "Authorization": "Bearer YOUR_TOKEN_HERE"
             }
@@ -217,10 +217,10 @@ async with MultiServerMCPClient(
 
 ```python
 from agents import Agent
-from agents.mcp import MCPServerSse
+from agents.mcp import MCPServerStreamableHttp
 
-mcp = MCPServerSse(
-    url="http://YOUR_IP:8080/sse",
+mcp = MCPServerStreamableHttp(
+    url="http://YOUR_IP:8080/mcp",
     headers={"Authorization": "Bearer YOUR_TOKEN_HERE"},
 )
 
@@ -233,7 +233,7 @@ agent = Agent(
 ### n8n
 
 1. Add an **MCP Client Tool** node to your workflow
-2. Set the URL to `http://YOUR_IP:8080/sse`
+2. Set the URL to `http://YOUR_IP:8080/mcp`
 3. Add a custom header: `Authorization: Bearer YOUR_TOKEN_HERE`
 4. The node auto-discovers all 4 tools (39 actions)
 
@@ -246,7 +246,9 @@ Add to `~/.openclaw/openclaw.json`:
   "mcp": {
     "servers": {
       "remote-claws": {
-        "url": "http://YOUR_IP:8080/sse",
+        "url": "http://YOUR_IP:8080/mcp",
+        "transport": "streamable-http",
+        "enabled": true,
         "headers": {
           "Authorization": "Bearer YOUR_TOKEN_HERE"
         }
@@ -256,7 +258,7 @@ Add to `~/.openclaw/openclaw.json`:
 }
 ```
 
-Then restart the gateway: `openclaw gateway restart`
+Then run `openclaw mcp reload` (or restart the gateway) — see the [setup guide](remote-claws-openclaw-setup-guide.md) for the full verification workflow.
 
 For a detailed walkthrough including skill installation and troubleshooting, see [remote-claws-openclaw-setup-guide.md](remote-claws-openclaw-setup-guide.md).
 
@@ -265,8 +267,8 @@ For a detailed walkthrough including skill installation and troubleshooting, see
 Remote Claws works with any MCP-compliant client. Connect to either transport:
 
 ```
-SSE:    http://YOUR_IP:8080/sse
-Streamable HTTP: http://YOUR_IP:8080/mcp
+Streamable HTTP (default): http://YOUR_IP:8080/mcp
+SSE (legacy):              http://YOUR_IP:8080/sse
 Header: Authorization: Bearer YOUR_TOKEN_HERE
 ```
 
@@ -302,7 +304,7 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 |----------|---------|-------------|
 | `REMOTE_CLAWS_HOST` | `0.0.0.0` | Bind address |
 | `REMOTE_CLAWS_PORT` | `8080` | Listen port |
-| `REMOTE_CLAWS_TRANSPORT` | `sse` | MCP transport: `sse` or `streamable-http` |
+| `REMOTE_CLAWS_TRANSPORT` | `streamable-http` | MCP transport: `streamable-http` or legacy `sse` (one at a time) |
 | `REMOTE_CLAWS_ALLOWED_IPS` | *(empty)* | Comma-separated source IPs allowed to connect. Empty = no IP filtering (rely on token auth). Checked before auth. |
 | `REMOTE_CLAWS_ALLOWED_HOSTS` | `*` | Comma-separated trusted Host headers. `*` disables host checking. |
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
@@ -345,7 +347,7 @@ Or set it in `remote-claws.json`:
 
 ```bash
 pip install "mcp[cli]>=1.20"
-export REMOTE_CLAWS_URL="http://<windows-ip>:8080/sse"
+export REMOTE_CLAWS_URL="http://<windows-ip>:8080/mcp"
 export REMOTE_CLAWS_TOKEN="<bearer token>"
 python scripts/smoke_browser.py
 ```

@@ -11,15 +11,15 @@ def _make_perms(data: dict) -> dict:
     return {"permissions": data}
 
 
-def test_transport_sse_default(tmp_path):
-    """Default transport should be SSE."""
+def test_transport_streamable_http_default(tmp_path):
+    """Default transport should be Streamable HTTP (SSE was deprecated by the MCP spec)."""
     (tmp_path / "perms.json").write_text("{}")
     (tmp_path / "auth.json").write_text(json.dumps({"token_hash": "abc123"}))
     cfg = AppConfig(
         permissions_file=str(tmp_path / "perms.json"),
         auth_file=str(tmp_path / "auth.json"),
     )
-    assert cfg.transport == "sse"
+    assert cfg.transport == "streamable-http"
 
 
 def test_transport_streamable_http(tmp_path, monkeypatch):

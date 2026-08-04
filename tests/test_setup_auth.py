@@ -31,13 +31,13 @@ def _run_with_answers(monkeypatch, answers):
 
 
 def test_first_run_writes_transport(config_dir, monkeypatch):
-    _run_with_answers(monkeypatch, ["2"])
-    assert json.loads(config_dir.read_text())["transport"] == "streamable-http"
-
-
-def test_first_run_enter_defaults_to_sse(config_dir, monkeypatch):
-    _run_with_answers(monkeypatch, [""])
+    _run_with_answers(monkeypatch, ["2"])  # pick SSE
     assert json.loads(config_dir.read_text())["transport"] == "sse"
+
+
+def test_first_run_enter_defaults_to_streamable_http(config_dir, monkeypatch):
+    _run_with_answers(monkeypatch, [""])
+    assert json.loads(config_dir.read_text())["transport"] == "streamable-http"
 
 
 def test_existing_transport_keep_by_default(config_dir, monkeypatch):
@@ -48,14 +48,14 @@ def test_existing_transport_keep_by_default(config_dir, monkeypatch):
 
 def test_existing_transport_can_be_changed(config_dir, monkeypatch):
     config_dir.write_text(json.dumps({"transport": "streamable-http"}))
-    _run_with_answers(monkeypatch, ["y", "1"])  # change, then pick SSE
+    _run_with_answers(monkeypatch, ["y", "2"])  # change, then pick SSE
     assert json.loads(config_dir.read_text())["transport"] == "sse"
 
 
 def test_existing_transport_enter_keeps_current(config_dir, monkeypatch):
-    config_dir.write_text(json.dumps({"transport": "streamable-http"}))
+    config_dir.write_text(json.dumps({"transport": "sse"}))
     _run_with_answers(monkeypatch, ["y", ""])  # change, then accept displayed default
-    assert json.loads(config_dir.read_text())["transport"] == "streamable-http"
+    assert json.loads(config_dir.read_text())["transport"] == "sse"
 
 
 def test_non_interactive_never_writes(config_dir, monkeypatch):
@@ -70,6 +70,6 @@ def test_non_interactive_never_writes(config_dir, monkeypatch):
 
 def test_preserves_other_config_keys(config_dir, monkeypatch):
     config_dir.write_text(json.dumps({"host": "192.168.1.5", "transport": "sse"}))
-    _run_with_answers(monkeypatch, ["y", "2"])
+    _run_with_answers(monkeypatch, ["y", "1"])  # switch to streamable-http
     data = json.loads(config_dir.read_text())
     assert data == {"host": "192.168.1.5", "transport": "streamable-http"}

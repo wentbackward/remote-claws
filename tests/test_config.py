@@ -9,7 +9,7 @@ def test_defaults():
     cfg = AppConfig()
     assert cfg.host == "0.0.0.0"
     assert cfg.port == 8080
-    assert cfg.transport == "sse"
+    assert cfg.transport == "streamable-http"
     assert cfg.browser_channel == "chrome"
     assert cfg.browser_stealth is True
     assert cfg.enabled_groups == "browser,desktop,exec,files"

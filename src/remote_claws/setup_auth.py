@@ -72,9 +72,9 @@ def _generate_token(auth_path: Path) -> bool:
 def _configure_transport() -> None:
     """Ask the user which MCP transport to use and persist the choice.
 
-    SSE is the legacy transport (Claude Desktop, openclaw, most existing
-    clients). Streamable HTTP is the MCP spec 2025-03-26+ transport
-    (Claude Code, newer SDKs).
+    Streamable HTTP is the current MCP spec transport (openclaw, Claude Code,
+    newer SDKs) and the recommended default. SSE is the legacy transport,
+    kept for Claude Desktop and older clients.
 
     If a transport is already configured we show the current value and offer
     to change it — re-running setup is precisely how an operator changes
@@ -101,26 +101,25 @@ def _configure_transport() -> None:
         if change not in {"y", "yes"}:
             return
 
-    default_choice = "2" if current == "streamable-http" else "1"
+    default_choice = "2" if current == "sse" else "1"
     response = input(
         "Which MCP transport should the server expose?\n"
         "\n"
-        "  1) SSE (legacy) — works with Claude Desktop, openclaw,\n"
-        "     most existing clients. Default.\n"
-        "  2) Streamable HTTP — MCP spec 2025-03-26+. Works with\n"
-        "     Claude Code and newer SDKs.\n"
+        "  1) Streamable HTTP — current MCP spec transport. Works with\n"
+        "     openclaw, Claude Code, and newer SDKs. Recommended.\n"
+        "  2) SSE (legacy) — for Claude Desktop and older clients.\n"
         "\n"
-        f"  [1] SSE  [2] Streamable HTTP  (default: {default_choice})\n"
+        f"  [1] Streamable HTTP  [2] SSE  (default: {default_choice})\n"
     ).strip()
 
     if response == "":
         # Enter accepts the displayed default (the current setting when one
-        # exists, SSE otherwise).
-        transport = "streamable-http" if default_choice == "2" else "sse"
-    elif response in {"2", "streamable-http", "streamable"}:
-        transport = "streamable-http"
-    else:
+        # exists, streamable-http otherwise).
+        transport = "sse" if default_choice == "2" else "streamable-http"
+    elif response in {"2", "sse"}:
         transport = "sse"
+    else:
+        transport = "streamable-http"
 
     # Merge into the existing config file (or create it).
     config_data: dict = {}

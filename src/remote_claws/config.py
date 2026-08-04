@@ -84,11 +84,12 @@ class AppConfig(BaseSettings):
     # regardless of permissions.json. Use this to keep heavy dependencies
     # (Playwright, pyautogui) out of memory on machines that don't need them.
     enabled_groups: str = "browser,desktop,exec,files"
-    # MCP transport to expose. "sse" is the legacy transport (works with
-    # Claude Desktop, openclaw, most existing clients). "streamable-http" is
-    # the MCP spec 2025-03-26+ transport (Claude Code, newer SDKs). Default
-    # is "sse" for backward compatibility.
-    transport: str = "sse"
+    # MCP transport to expose. "streamable-http" is the current MCP spec
+    # transport (openclaw, Claude Code, newer SDKs). "sse" is the legacy
+    # transport, kept for Claude Desktop and older clients. Only one is
+    # served at a time. Default is "streamable-http" (SSE was deprecated
+    # by the MCP spec).
+    transport: str = "streamable-http"
 
     def __init__(self, **overrides):
         # Determine config file path: explicit override > env var > default

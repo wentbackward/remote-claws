@@ -24,7 +24,7 @@ On your dev machine (NOT the Windows box):
     .smoke-venv/bin/activate          # or .smoke-venv\\Scripts\\activate on Windows
     pip install "mcp[cli]>=1.20"
 
-    export REMOTE_CLAWS_URL="http://<windows-tailscale-ip>:8080/sse"
+    export REMOTE_CLAWS_URL="http://<windows-tailscale-ip>:8080/mcp"
     export REMOTE_CLAWS_TOKEN="<bearer token from remote-claws-setup>"
 
     python scripts/smoke_browser.py
@@ -32,8 +32,11 @@ On your dev machine (NOT the Windows box):
 Or as flags:
 
     python scripts/smoke_browser.py \\
-        --url http://192.168.1.42:8080/sse \\
+        --url http://192.168.1.42:8080/mcp \\
         --token YOUR_TOKEN_HERE
+
+The transport is inferred from the URL path: /mcp = Streamable HTTP (the
+server default), anything else = legacy SSE.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ from typing import Any
 try:
     from mcp import ClientSession
     from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamablehttp_client
 except ImportError:
     print(
         "ERROR: the 'mcp' package is not installed. Run:\n    pip install \"mcp[cli]>=1.20\"",
@@ -344,10 +348,20 @@ async def run_smoke(driver: Driver) -> None:
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def open_session(url: str, token: str):
+    """Connect over the transport implied by the URL path: /mcp = streamable
+    HTTP (server default), anything else = legacy SSE."""
     headers = {"Authorization": f"Bearer {token}"}
-    async with sse_client(url, headers=headers) as (read, write), ClientSession(read, write) as session:
-        await session.initialize()
-        yield session
+    if url.rstrip("/").endswith("/mcp"):
+        async with (
+            streamablehttp_client(url, headers=headers) as (read, write, _get_session_id),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            yield session
+    else:
+        async with sse_client(url, headers=headers) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
 
 
 async def amain(url: str, token: str) -> int:
