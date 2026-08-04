@@ -1,397 +1,106 @@
 # TOOLS.md — Remote Claws Tool Reference
 
-Complete reference for all 39 tools exposed by Remote Claws. Tools are organized into four permission groups: `browser`, `desktop`, `exec`, and `files`. Each tool can be individually allowed or denied in `permissions.json`.
+Remote Claws exposes **4 MCP tools** covering 39 actions. Each tool takes an
+`action` parameter plus that action's params, like a CLI subcommand:
+
+```
+remote_browser(action="navigate", url="https://example.com")
+```
+
+An unknown action returns a JSON error listing the valid actions. Params not
+listed for an action are ignored. Required params must be non-empty.
+
+## Permissions
+
+`permissions.json` gates at two levels:
+
+- **Group level (registration time):** if a group is disabled or fully denied,
+  its tool is never registered and never appears in `tools/list`.
+- **Action level (call time):** `allow`/`deny` entries are bare action names
+  per group; deny always wins. A denied action returns
+  `{"error": "permission denied: <group>:<action>"}`.
+
+Legacy entries using old tool names (`browser_navigate`, `file_read`) are
+auto-normalized to bare action names at load, with a deprecation warning in
+the server log.
 
 ---
 
-## Browser Tools
-
-Automate a Chromium browser via Playwright. The browser launches lazily on first use and persists across calls. All selectors are CSS selectors.
-
-### browser_navigate
-
-Navigate to a URL and wait for the page to load.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `url` | string | *required* | The URL to navigate to |
-
-**Returns**: Page title, final URL, and HTTP status code.
-
-### browser_click
-
-Click an element on the page.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | *required* | CSS selector of the element |
-| `button` | string | `"left"` | Mouse button: `"left"`, `"right"`, `"middle"` |
-| `click_count` | int | `1` | Number of clicks (2 for double-click) |
-
-### browser_fill
-
-Clear an input/textarea and set its value. Triggers change events.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | *required* | CSS selector of the input |
-| `value` | string | *required* | The value to set |
-
-### browser_type
-
-Type text keystroke-by-keystroke into an element. Does **not** clear existing content — appends to it.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | *required* | CSS selector of the element |
-| `text` | string | *required* | Text to type |
-| `delay` | int | `0` | Delay between keystrokes in milliseconds |
-
-### browser_press_key
-
-Press a keyboard key or key combination.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `key` | string | *required* | Key name, e.g. `"Enter"`, `"Escape"`, `"Tab"`, `"Control+a"`, `"Meta+c"` |
-
-### browser_get_text
-
-Extract the visible text content of an element.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | `"body"` | CSS selector of the element |
-
-**Returns**: The `innerText` of the element.
-
-### browser_get_html
-
-Get the HTML markup of an element.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | `"html"` | CSS selector |
-| `outer` | bool | `true` | `true` for outerHTML, `false` for innerHTML |
-
-### browser_eval_js
-
-Evaluate a JavaScript expression in the page context.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `expression` | string | *required* | JavaScript to evaluate |
-
-**Returns**: JSON-serialized result of the expression.
-
-### browser_screenshot
-
-Take a screenshot of the page or a specific element.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | `""` | CSS selector to screenshot (empty = full page viewport) |
-| `full_page` | bool | `false` | Capture the full scrollable page (ignored if selector is set) |
-| `save_to_disk` | bool | `false` | Also save the image to the configured screenshot directory |
-
-**Returns**: JPEG image, downscaled to max 1280x960.
-
-### browser_wait_for
-
-Wait for an element to reach a specified state.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | *required* | CSS selector |
-| `state` | string | `"visible"` | Target state: `"visible"`, `"hidden"`, `"attached"`, `"detached"` |
-| `timeout` | int | `10000` | Timeout in milliseconds |
-
-### browser_select_option
-
-Select an option from a `<select>` dropdown.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `selector` | string | *required* | CSS selector of the select element |
-| `value` | string | *required* | Option value or visible label text |
-
-### browser_go_back
-
-Navigate back in browser history. Returns new page title and URL.
-
-### browser_go_forward
-
-Navigate forward in browser history. Returns new page title and URL.
-
-### browser_tabs_list
-
-List all open tabs. Returns JSON array with `index`, `url`, `title`, and `active` flag for each tab.
-
-### browser_tab_new
-
-Open a new browser tab.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `url` | string | `"about:blank"` | URL to open in the new tab |
-
-### browser_tab_close
-
-Close a browser tab.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `index` | int | `-1` | Tab index to close (`-1` = current active tab) |
-
----
-
-## Desktop Tools
-
-Control the Windows desktop via mouse, keyboard, and UI automation. Screenshots use absolute screen coordinates. pyautogui failsafe is enabled — mouse to (0,0) aborts.
-
-### desktop_screenshot
-
-Capture the screen or a region.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `region` | list[int] | `null` | Optional `[x, y, width, height]` to capture a region |
-| `save_to_disk` | bool | `false` | Also save the image to disk |
-
-**Returns**: JPEG image, downscaled to max 1280x960.
-
-### desktop_mouse_click
-
-Click at absolute screen coordinates.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `x` | int | *required* | X coordinate |
-| `y` | int | *required* | Y coordinate |
-| `button` | string | `"left"` | `"left"`, `"right"`, `"middle"` |
-| `clicks` | int | `1` | Number of clicks |
-
-### desktop_mouse_move
-
-Move the mouse cursor.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `x` | int | *required* | Target X coordinate |
-| `y` | int | *required* | Target Y coordinate |
-| `duration` | float | `0.2` | Movement duration in seconds |
-
-### desktop_mouse_drag
-
-Drag from one position to another.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `start_x` | int | *required* | Starting X |
-| `start_y` | int | *required* | Starting Y |
-| `end_x` | int | *required* | Ending X |
-| `end_y` | int | *required* | Ending Y |
-| `duration` | float | `0.5` | Drag duration in seconds |
-
-### desktop_type_text
-
-Type text at the current cursor/focus position using simulated keystrokes.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `text` | string | *required* | Text to type |
-| `interval` | float | `0.02` | Delay between keystrokes in seconds |
-
-**Note**: Uses `pyautogui.typewrite` which only supports ASCII characters. For Unicode, use `desktop_press_key` or clipboard-based approaches.
-
-### desktop_press_key
-
-Press a key or hotkey combination.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `keys` | string | *required* | Key(s) separated by `+`, e.g. `"enter"`, `"ctrl+c"`, `"alt+tab"`, `"win"` |
-
-### desktop_scroll
-
-Scroll at a screen position.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `x` | int | *required* | X coordinate to scroll at |
-| `y` | int | *required* | Y coordinate to scroll at |
-| `clicks` | int | `3` | Scroll amount |
-| `direction` | string | `"down"` | `"up"` or `"down"` |
-
-### desktop_find_window
-
-Find windows by title or class name. Uses pywinauto UIA backend.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `title` | string | `""` | Substring to match in window title (case-insensitive) |
-| `class_name` | string | `""` | Substring to match in window class name |
-
-**Returns**: JSON array of matching windows with `title`, `class_name`, and `rectangle` (left/top/right/bottom).
-
-### desktop_focus_window
-
-Bring a window to the foreground.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `title` | string | *required* | Substring to match in window title |
-
-### desktop_list_elements
-
-Enumerate UI controls within a window. Useful for discovering button names, text fields, etc.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `window_title` | string | *required* | Window title substring |
-| `control_type` | string | `""` | Filter by type: `"Button"`, `"Edit"`, `"Text"`, `"CheckBox"`, etc. |
-| `max_depth` | int | `4` | How deep to traverse the UI tree |
-
-**Returns**: JSON array (max 200 entries) with `name`, `control_type`, and `automation_id` for each element.
-
-### desktop_click_element
-
-Click a UI element by its name within a window. More reliable than coordinate clicking.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `window_title` | string | *required* | Window title substring |
-| `element_name` | string | *required* | Exact name of the UI element |
-| `control_type` | string | `""` | Optional filter to disambiguate (e.g. `"Button"`) |
-
-### desktop_get_element_text
-
-Read the text or value of a UI element by name.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `window_title` | string | *required* | Window title substring |
-| `element_name` | string | *required* | Exact name of the UI element |
-| `control_type` | string | `""` | Optional filter |
-
----
-
-## Exec Tools
-
-Run commands asynchronously on the host machine. Processes are tracked by a short ID and persist until killed or the server shuts down.
-
-### exec_run
-
-Start a command. Returns immediately with a process ID.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `command` | string | *required* | The command or executable to run |
-| `args` | list[string] | `null` | Arguments to pass |
-| `cwd` | string | `null` | Working directory |
-| `timeout` | int | `0` | Auto-kill after this many seconds (0 = no timeout) |
-| `shell` | bool | `false` | Run via system shell (supports pipes, redirects, builtins) |
-
-**Returns**: JSON with `process_id` (8-char hex), `pid`, and `status`.
-
-### exec_get_output
-
-Retrieve stdout and stderr from a tracked process.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `process_id` | string | *required* | The process ID from exec_run |
-| `wait` | bool | `false` | Block until the process exits |
-| `timeout` | int | `30` | Max seconds to wait (only when wait=true) |
-
-**Returns**: JSON with `stdout`, `stderr`, `running` (bool), and `exit_code` (null if still running).
-
-### exec_send_input
-
-Send a line of text to a running process's stdin. A newline is appended automatically.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `process_id` | string | *required* | The process ID |
-| `input_text` | string | *required* | Text to send |
-
-### exec_kill
-
-Terminate a running process.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `process_id` | string | *required* | The process ID |
-
-### exec_list
-
-List all tracked processes with their command, status, and PID. Takes no parameters.
-
----
-
-## File Tools
-
-Read and write files on the host machine. All file content is transferred as base64 to handle binary safely.
-
-### file_write
-
-Write content to a file. Creates parent directories by default.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | *required* | Destination file path |
-| `content_base64` | string | *required* | File content, base64-encoded |
-| `make_dirs` | bool | `true` | Create parent directories if they don't exist |
-
-**Returns**: JSON with `path` (resolved) and `bytes` written.
-
-### file_read
-
-Read a file and return its content as base64. Supports chunked reading for large files.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | *required* | File path to read |
-| `offset` | int | `0` | Byte offset to start reading from |
-| `limit` | int | `0` | Max bytes to read (0 = entire file) |
-
-**Returns**: JSON with `content_base64`, `size` (total file size), `offset`, and `bytes_read`.
-
-### file_list
-
-List files and directories matching a pattern.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | `"."` | Directory to list |
-| `pattern` | string | `"*"` | Glob pattern (e.g. `"*.txt"`, `"**/*.py"`) |
-| `recursive` | bool | `false` | Search subdirectories |
-
-**Returns**: JSON array (max 500 entries) with `path`, `is_dir`, `size`, and `modified` timestamp.
-
-### file_delete
-
-Delete a file or empty directory.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | *required* | Path to delete |
-
-### file_move
-
-Move or rename a file or directory. Creates destination parent directories.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `src` | string | *required* | Source path |
-| `dst` | string | *required* | Destination path |
-
-### file_info
-
-Get metadata about a file or directory.
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | *required* | Path to inspect |
-
-**Returns**: JSON with `exists`, `is_dir`, `size`, `modified`, and `created` timestamps.
+## remote_browser
+
+Control the web browser on the REMOTE machine (persistent system Chrome via
+Playwright). All selectors are CSS selectors. The browser is stateful: pages,
+tabs, cookies and logins persist between calls. Returns text (JSON) for most
+actions, a JPEG image for `screenshot`.
+
+| Action | Params | Description |
+|--------|--------|-------------|
+| `navigate` | `url` (required), `wait_until="load"`, `settle_ms=0`, `timeout=30000` | Go to a URL. `wait_until`: `commit` \| `domcontentloaded` \| `load` \| `networkidle`. `settle_ms`: extra pause after load (SPA hydration, anti-bot interstitials). Returns final URL, title, HTTP status. |
+| `go_back` | — | Navigate back in tab history. |
+| `go_forward` | — | Navigate forward in tab history. |
+| `click` | `selector` (required), `button="left"`, `click_count=1` | Click an element. `click_count=2` for double-click. |
+| `fill` | `selector` (required), `value` (required) | Set input/textarea value: clears first, fires change events, Unicode-safe. |
+| `type` | `selector` (required), `text` (required), `delay=0` | Type keystroke-by-keystroke (appends, does NOT clear). `delay` in ms/key. To select all before replacing: `press_key key="Control+a"` first. |
+| `press_key` | `key` (required) | One key or combo: `"Enter"`, `"Escape"`, `"Tab"`, `"Control+a"`. |
+| `select_option` | `selector` (required), `value` (required) | Choose a `<select>` option by value or label. |
+| `get_text` | `selector="body"` | Visible inner text of an element. |
+| `get_html` | `selector="html"`, `outer=true` | HTML markup; `outer=false` for innerHTML only. |
+| `eval_js` | `expression` (required) | Run JavaScript in the page; JSON-serialized result. Use to clear a field without typing, read computed state, etc. |
+| `wait_for` | `selector` (required), `state="visible"`, `timeout=10000` | Block until element reaches state: `visible` \| `hidden` \| `attached` \| `detached`. |
+| `screenshot` | `selector=""`, `full_page=false`, `save_to_disk=false` | JPEG of viewport, full page, or one element. |
+| `tabs_list` | — | All open tabs (index, url, title). |
+| `tab_new` | `url="about:blank"` | Open a tab (becomes active). |
+| `tab_close` | `index=-1` | Close a tab (`-1` = current). |
+
+## remote_desktop
+
+Control the REMOTE machine's desktop: mouse, keyboard, screenshots, and
+Windows UI automation. Coordinates are absolute screen pixels. Returns text
+for most actions, a JPEG image for `screenshot`. Moving the mouse to (0,0)
+aborts (pyautogui failsafe).
+
+Workflow: screenshot first, act, re-screenshot to verify. Prefer element-name
+actions over coordinates — coordinates break when windows move.
+
+| Action | Params | Description |
+|--------|--------|-------------|
+| `screenshot` | `region=None` ([x,y,w,h]), `save_to_disk=false` | JPEG of the full screen or a region. |
+| `mouse_click` | `x`, `y` (required), `button="left"`, `clicks=1` | Click at screen coordinates. `clicks=2` = double-click. |
+| `mouse_move` | `x`, `y` (required), `duration=0.2` | Move cursor to coordinates. |
+| `mouse_drag` | `start_x`, `start_y`, `end_x`, `end_y` (required), `duration=0.5` | Drag between coordinates. |
+| `scroll` | `x`, `y` (required), `clicks=3`, `direction="down"` | Scroll at position. `direction`: `up` \| `down`. |
+| `type_text` | `text` (required), `interval=0.02` | Type at current focus. ASCII only. |
+| `press_key` | `keys` (required) | Key or combo: `"enter"`, `"ctrl+c"`, `"alt+tab"`, `"win"`. |
+| `find_window` | `title=""`, `class_name=""` | List visible windows with title, class, rectangle (substring filters). |
+| `focus_window` | `title` (required) | Bring matching window to foreground. |
+| `list_elements` | `window_title` (required), `control_type=""`, `max_depth=4` | Enumerate controls (Button, Edit, ...) with name/automation_id. Capped at 200. |
+| `click_element` | `window_title`, `element_name` (required), `control_type=""` | Click a named UI element — resolution-independent. |
+| `get_element_text` | `window_title`, `element_name` (required), `control_type=""` | Read text/value of a named UI element. |
+
+## remote_exec
+
+Run commands on the REMOTE machine. Processes are asynchronous: `run` returns
+a process_id immediately; poll with `get_output`.
+
+| Action | Params | Description |
+|--------|--------|-------------|
+| `run` | `command` (required), `args=None`, `cwd=None`, `timeout=0`, `shell=false` | Start a process; returns `{process_id, pid, status}`. `shell=true` runs via the system shell (pipes, redirects, builtins). `timeout>0` auto-kills after N seconds. |
+| `get_output` | `process_id` (required), `wait=false`, `timeout=30` | Accumulated stdout/stderr, running flag, exit code. `wait=true` blocks until exit or timeout. |
+| `send_input` | `process_id` (required), `input_text` (required) | Write a line to stdin (newline appended). |
+| `kill` | `process_id` (required) | Terminate a running process. |
+| `list` | — | All tracked processes with status. |
+
+Processes persist until killed or server shutdown — kill them when done.
+
+## remote_files
+
+Read and write files on the REMOTE machine. Binary content is base64-encoded.
+
+| Action | Params | Description |
+|--------|--------|-------------|
+| `read` | `path` (required), `offset=0`, `limit=0` | `{path, size, offset, bytes_read, content_base64}`. `limit=0` reads whole file; use offset/limit to chunk large files. |
+| `write` | `path` (required), `content_base64` (required), `make_dirs=true` | Write decoded bytes to path; creates parent dirs when `make_dirs`. |
+| `list` | `path="."`, `pattern="*"`, `recursive=false` | Glob listing with `{path, is_dir, size, modified}`. Capped at 500 entries. |
+| `delete` | `path` (required) | Delete a file or EMPTY directory. |
+| `move` | `src` (required), `dst` (required) | Move/rename; creates destination parent dirs. |
+| `info` | `path` (required) | `{exists, is_dir, size, modified, created}`. |
