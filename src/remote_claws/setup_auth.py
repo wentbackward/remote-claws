@@ -76,24 +76,32 @@ def _configure_transport() -> None:
     clients). Streamable HTTP is the MCP spec 2025-03-26+ transport
     (Claude Code, newer SDKs).
 
-    If the config file already exists and contains a transport setting we
-    skip the prompt — the user already made a choice.
+    If a transport is already configured we show the current value and offer
+    to change it — re-running setup is precisely how an operator changes
+    their mind, so a pre-existing setting must not silently skip the prompt.
+    Non-interactive runs (piped stdin) never prompt and never write.
     """
     config_path = Path(AppConfig().config_file)
+    existing: dict = {}
     if config_path.exists():
         try:
             with open(config_path) as f:
                 existing = json.load(f)
-            if "transport" in existing:
-                # Already configured — nothing to do.
-                return
         except (json.JSONDecodeError, OSError):
             pass
 
     if not sys.stdin.isatty():
-        # Non-interactive: default to SSE.
+        # Non-interactive: leave any existing setting alone; unconfigured
+        # servers fall back to the AppConfig default (SSE).
         return
 
+    current = existing.get("transport")
+    if current is not None:
+        change = input(f"MCP transport is currently '{current}'. Change it? [y/N] ").strip().lower()
+        if change not in {"y", "yes"}:
+            return
+
+    default_choice = "2" if current == "streamable-http" else "1"
     response = input(
         "Which MCP transport should the server expose?\n"
         "\n"
@@ -102,12 +110,17 @@ def _configure_transport() -> None:
         "  2) Streamable HTTP — MCP spec 2025-03-26+. Works with\n"
         "     Claude Code and newer SDKs.\n"
         "\n"
-        "  [1] SSE  [2] Streamable HTTP  (default: 1)\n"
+        f"  [1] SSE  [2] Streamable HTTP  (default: {default_choice})\n"
     ).strip()
 
-    transport = "sse"
-    if response in {"2", "streamable-http", "streamable"}:
+    if response == "":
+        # Enter accepts the displayed default (the current setting when one
+        # exists, SSE otherwise).
+        transport = "streamable-http" if default_choice == "2" else "sse"
+    elif response in {"2", "streamable-http", "streamable"}:
         transport = "streamable-http"
+    else:
+        transport = "sse"
 
     # Merge into the existing config file (or create it).
     config_data: dict = {}
