@@ -85,10 +85,10 @@ class BrowserManager:
             raise BrowserStartupError(
                 "browser_channel='chrome' but Google Chrome was not found "
                 "on this machine. Install Chrome from "
-                "https://www.google.com/chrome/, or set "
-                "REMOTE_CLAWS_BROWSER_CHANNEL=chromium to use the "
-                "bundled Playwright build (test mode \u2014 will be flagged "
-                "by anti-bot vendors)."
+                "https://www.google.com/chrome/. (The bundled Chromium "
+                "build via REMOTE_CLAWS_BROWSER_CHANNEL=chromium exists "
+                "for CI only \u2014 it is visibly automated and will trip "
+                "bot walls.)"
             )
 
     # ----- public surface used by tools (unchanged) -------------------------

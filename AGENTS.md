@@ -12,7 +12,7 @@ Remote Claws is an MCP (Model Context Protocol) server for remote machine contro
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e .
-playwright install chromium  # optional — only for browser_channel=chromium / CI
+# no playwright browser download needed — channel=chrome (default) drives system Chrome
 remote-claws-setup            # generates auth token, picks transport (SSE or Streamable HTTP)
 remote-claws                  # starts server on 0.0.0.0:8080
 ```
@@ -26,7 +26,7 @@ Three-layer config: env vars (`REMOTE_CLAWS_` prefix) override `remote-claws.jso
 Key settings:
 - `REMOTE_CLAWS_ALLOWED_HOSTS` (default: `*`): comma-separated trusted Host headers. Set to specific IPs when connecting over VPN/Tailscale to avoid 421 errors. `*` disables host checking.
 - `REMOTE_CLAWS_PORT`, `REMOTE_CLAWS_HOST`, `REMOTE_CLAWS_BROWSER_HEADLESS`
-- `REMOTE_CLAWS_BROWSER_CHANNEL` (default: `chrome`): drive system Google Chrome with a persistent profile (real fingerprint, the user's identity). Set to `chromium` to use the bundled Playwright build for testing or internal sites.
+- `REMOTE_CLAWS_BROWSER_CHANNEL` (default: `chrome`): drive system Google Chrome with a persistent profile (real fingerprint, the user's identity) — almost always what you want. `chromium` uses the bundled Playwright build and exists for CI only (requires `playwright install chromium`).
 - `REMOTE_CLAWS_BROWSER_PROFILE_DIR` (default: OS-appropriate per-user path): override the dedicated Chrome user-data directory.
 - `REMOTE_CLAWS_BROWSER_STEALTH` (default: `true`): apply `tf-playwright-stealth` to every page.
 - `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH`, `REMOTE_CLAWS_SCREENSHOT_MAX_HEIGHT`, `REMOTE_CLAWS_SCREENSHOT_QUALITY`

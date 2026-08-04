@@ -37,10 +37,11 @@ cd remote-claws
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-playwright install chromium
 remote-claws-setup     # generates the bearer token; copy it — shown once
 remote-claws           # starts the server
 ```
+
+No `playwright install` step is needed — the default channel drives system Chrome.
 
 The server runs in the **foreground** — keep the terminal open. You'll see tool calls logged as agents use them.
 

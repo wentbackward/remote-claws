@@ -31,8 +31,9 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # Linux/macOS
 pip install -e .
-playwright install chromium  # optional — only needed for browser_channel=chromium / CI; channel=chrome (default) drives system Chrome
 ```
+
+No `playwright install` step is needed — the default `browser_channel=chrome` drives your **system Chrome**, not a bundled browser.
 
 ### 1. Generate Auth Token
 
@@ -54,11 +55,9 @@ remote-claws-browser-setup --url https://nytimes.com
 
 Chrome opens on a **dedicated profile** (separate from your daily Chrome) under `%LOCALAPPDATA%\RemoteClaws\chrome-profile` on Windows, `~/.local/share/remote-claws/chrome-profile` on Linux, `~/Library/Application Support/RemoteClaws/chrome-profile` on macOS. Sign into the services you want the agent to access, install your adblocker, accept cookie banners, then close the window. Sessions persist across server restarts.
 
-The browser group defaults to **driving system-installed Google Chrome** with this persistent profile — not the bundled Playwright Chromium. This is what lets the agent browse like you do: signed into subscriptions, past bot walls, with your adblocker. To fall back to bundled Chromium (e.g. CI, internal testing):
+The browser group drives **system-installed Google Chrome** with this persistent profile — this is the whole point of the feature: the agent browses like you do, signed into subscriptions, past bot walls, with your adblocker.
 
-```bash
-REMOTE_CLAWS_BROWSER_CHANNEL=chromium remote-claws
-```
+You probably do **not** want the bundled Playwright Chromium (`browser_channel=chromium`). If all you need is a plain automatable browser, run one locally where your agent lives (e.g. openclaw's built-in browser) — don't stand up a remote server for that. The chromium channel exists only for CI and similar throwaway environments, and requires `playwright install chromium`.
 
 The server hard-fails at startup if `browser_channel=chrome` (the default) and Chrome isn't installed.
 
@@ -310,7 +309,7 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 | `REMOTE_CLAWS_AUTH_FILE` | `.remote-claws-auth.json` | Path to auth hash file |
 | `REMOTE_CLAWS_PERMISSIONS_FILE` | `permissions.json` | Path to permission policy |
 | `REMOTE_CLAWS_ENABLED_GROUPS` | `browser,desktop,exec,files` | Tool groups loaded at startup. Groups not listed are not imported and expose no tools. |
-| `REMOTE_CLAWS_BROWSER_CHANNEL` | `chrome` | Which browser to drive. `chrome` = system Google Chrome (real fingerprint, persistent profile). `chromium` = bundled Playwright build (lightweight, repeatable, visibly automated). |
+| `REMOTE_CLAWS_BROWSER_CHANNEL` | `chrome` | Which browser to drive. `chrome` = system Google Chrome (real fingerprint, persistent profile) — almost always what you want. `chromium` = bundled Playwright build for CI (requires `playwright install chromium`; visibly automated, will trip bot walls). |
 | `REMOTE_CLAWS_BROWSER_PROFILE_DIR` | OS default | Override the Chrome user-data directory. Empty = OS-appropriate default. |
 | `REMOTE_CLAWS_BROWSER_STEALTH` | `true` | Apply tf-playwright-stealth patches to every page. Disable only if a site misbehaves under them. |
 | `REMOTE_CLAWS_BROWSER_HEADLESS` | `false` | Run Chrome headless. Strongly discouraged when `browser_channel=chrome` — anti-bot vendors fingerprint headless rendering. |
