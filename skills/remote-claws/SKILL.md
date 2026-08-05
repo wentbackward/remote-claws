@@ -7,7 +7,9 @@ homepage: https://github.com/wentbackward/remote-claws
 # Remote Claws — Remote Machine Control
 
 Provide permission-based access to a remote desktop machine via the
-remote-claws MCP server (https://github.com/wentbackward/remote-claws).
+remote-claws MCP server (https://github.com/wentbackward/remote-claws) allowing
+your agent to run in a sandbox.
+
 Four tools, each taking an `action` parameter: `remote_browser`, `remote_desktop`,
 `remote_exec`, `remote_files`. Read each tool's description for its action
 list — an unknown action returns the valid list.
@@ -16,8 +18,7 @@ list — an unknown action returns the valid list.
 
 The `remote_*` tools act on the REMOTE machine. OpenClaw's built-in `browser`,
 `exec`, `read`/`write`/`edit` act on the LOCAL gateway machine. Never
-substitute one for the other. If the user says "on Windows", 
-"on the remote machine", use `remote_*` tools. Do not confuse it with remote
+substitute one for the other. Take care not to confuse remote-claws with remote
 SSH commands.
 
 ## Strategy
@@ -59,19 +60,16 @@ and [README](https://github.com/wentbackward/remote-claws#security).
 
 ## Important Notes
 
-- Screenshots are JPEG, max 1280x960. Coordinates are absolute pixels.
-- **Text-only model? Large binary?** Never pull binary content into context.
-  Call `remote_desktop(action="screenshot", save_to_disk=true)` (or
-  `remote_files(action="read", path=..., as_url=true)` for any file) — you get
-  a short-lived download URL. Hand the URL to the image tool, which fetches it
-  gateway-side and routes to the vision-capable imageModel.
-- **Inline read cap:** plain `remote_files(action="read", ...)` returns base64
-  only up to 1MB. Bigger reads fail with `"inline read would return N bytes"`.
-  Recovery: re-issue the same read with `as_url=true` and use the returned
-  URL — do NOT retry the plain read. Small chunks via offset/limit still work.
+- Screenshots are JPEG, max 1280x960. Coordinates are absolute pixels. If your main
+  LLM supports images, openclaw media handling should just work. Otherwise use
+  `remote_desktop(action="screenshot", save_to_disk=true)` and download the binary.
+- **Reading Remote Files**: `remote_files(action="read", ...)` returns base64
+  only up to a threshold. Bigger reads fail with `"inline read would return N bytes"`
+  to avoid context token explosion. Re-issue the same read with `as_url=true` and use
+  the returned URL to download — do NOT retry the plain read. Small chunks via
+  offset/limit will work.
 - `type_text` is ASCII only. For Unicode, use browser `fill`, or clipboard:
   `remote_exec(action="run", command="powershell", args=["Set-Clipboard", ...])`
   then `remote_desktop(action="press_key", keys="ctrl+v")`.
-- File content is base64 encoded. Decode after reading.
 - The browser launches on first use and stays open across calls. Sessions
   persist (cookies, local storage).
