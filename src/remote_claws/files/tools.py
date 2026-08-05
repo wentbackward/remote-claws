@@ -21,12 +21,33 @@ def h_write(app: Any, path: str, content_base64: str, make_dirs: bool = True) ->
     return json.dumps({"status": "written", "path": str(p.resolve()), "bytes": len(data)})
 
 
-def h_read(app: Any, path: str, offset: int = 0, limit: int = 0) -> str:
+def h_read(
+    app: Any,
+    path: str,
+    offset: int = 0,
+    limit: int = 0,
+    as_url: bool = False,
+    request_host: str = "",
+) -> str:
     p = Path(path)
     if not p.exists():
         return json.dumps({"error": f"File not found: {path}"})
 
     file_size = p.stat().st_size
+
+    # as_url: register a short-lived capability URL instead of returning
+    # content. For large binaries — never pull those through model context.
+    if as_url:
+        name = app.shots.register(p)
+        result: dict[str, Any] = {
+            "path": str(p.resolve()),
+            "size_bytes": file_size,
+            "expires_in": app.shots.ttl_seconds,
+        }
+        if request_host:
+            result["url"] = f"http://{request_host}/dl/{name}"
+        return json.dumps(result)
+
     with open(p, "rb") as f:
         if offset > 0:
             f.seek(offset)
@@ -133,15 +154,20 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         recursive: bool = False,
         src: str = "",
         dst: str = "",
+        as_url: bool = False,
         ctx: Context = None,
     ) -> str:
         """Read and write files on the REMOTE machine. Binary content is base64-encoded.
 
         Actions (params not listed for an action are ignored):
 
-          read path=<path> [offset=0] [limit=0]
+          read path=<path> [offset=0] [limit=0] [as_url=false]
               Return file content as {path, size, offset, bytes_read, content_base64}.
               limit=0 reads the whole file; use offset/limit to chunk large files.
+              as_url=true returns {"path", "size_bytes", "url", "expires_in"}
+              instead of content — use for LARGE BINARIES (images, video, PDF):
+              hand the url to a tool that fetches out-of-band. Never base64 a
+              big binary into your context.
           write path=<path> content_base64=<b64> [make_dirs=true]
               Write decoded bytes to path; creates parent dirs when make_dirs.
           list [path=.] [pattern=*] [recursive=false]
@@ -157,6 +183,10 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         permission error — do not retry them.
         """
         app = ctx.request_context.lifespan_context
+        # Host the client used to reach us — builds download URLs for as_url
+        # reads. Threaded internally; never part of the tool's public schema.
+        request = getattr(ctx.request_context, "request", None)
+        request_host = request.headers.get("host", "") if request is not None else ""
         return await run_action(
             group="files",
             handlers=HANDLERS,
@@ -172,6 +202,8 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
                 "recursive": recursive,
                 "src": src,
                 "dst": dst,
+                "as_url": as_url,
+                "request_host": request_host,
             },
             permissions=permissions,
         )

@@ -75,6 +75,9 @@ class AppConfig(BaseSettings):
     screenshot_max_height: int = 960
     screenshot_quality: int = 75
     screenshot_dir: str = ""
+    # Seconds a /shots/ download URL stays valid after a screenshot is saved.
+    # Files are also evicted when more than MAX_SHOTS (32) are outstanding.
+    shot_ttl_seconds: int = 600
     permissions_file: str = "permissions.json"
     allowed_ips: str = ""  # comma-separated; empty = allow all (rely on token auth only)
     auth_file: str = ".remote-claws-auth.json"

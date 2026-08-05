@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import sys
 
@@ -13,6 +13,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from remote_claws.auth import HashedTokenVerifier, load_token_hash
 from remote_claws.config import AppConfig
 from remote_claws.permissions import PermissionChecker
+from remote_claws.shots import ShotRegistry
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -89,6 +90,9 @@ class AppContext:
     browser: object | None
     permissions: PermissionChecker
     processes: dict  # remote_exec process tracker
+    # Download-URL registry for saved screenshots (see shots.py). One registry
+    # per process, shared by every MCP request.
+    shots: ShotRegistry = field(default_factory=ShotRegistry)
 
 
 def _build_permissions() -> tuple[AppConfig, PermissionChecker]:
@@ -157,6 +161,7 @@ def _build_app_context() -> AppContext:
         browser=browser,
         permissions=_PERMISSIONS,
         processes={},
+        shots=ShotRegistry(ttl_seconds=_CONFIG.shot_ttl_seconds),
     )
 
 
@@ -340,6 +345,27 @@ def main():
     global _APP_CONTEXT
     _APP_CONTEXT = _build_app_context()
 
+    # Binary-artifact download endpoint. Tool results must not carry binary
+    # content (context explosion / text-only models), so saved artifacts are
+    # served by short-lived capability URL instead. Bearer-exempt BY DESIGN:
+    # the fetching tool (e.g. an image analyzer) cannot attach Authorization
+    # headers — the unguessable 128-bit name + short TTL is the credential.
+    # The IP allowlist middleware (outer layer) still applies, and only
+    # server-registered files are ever served (registry lookup, never a
+    # filesystem join from request input).
+    from starlette.responses import FileResponse
+    from starlette.routing import Route
+
+    async def _download_shot(request: Request):
+        name = request.path_params["name"]
+        app = _APP_CONTEXT
+        path = app.shots.resolve(name) if app is not None else None
+        if path is None:
+            return JSONResponse({"error": "not found or expired"}, status_code=404)
+        return FileResponse(path)
+
+    _shot_route = Route("/dl/{name}", _download_shot, methods=["GET"])
+
     # ASGI wrapper that runs app-context teardown after the wrapped app has
     # completed its own shutdown. The MCP lifespan cannot own teardown: in
     # stateless streamable-HTTP mode it runs per request, so its exit would
@@ -368,6 +394,12 @@ def main():
 
         async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
             if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            # Capability-URL downloads (/dl/) are bearer-exempt by design —
+            # see the comment at the route registration above.
+            if scope["path"].startswith("/dl/"):
                 await self.app(scope, receive, send)
                 return
 
@@ -491,6 +523,8 @@ def main():
     else:
         logger.info("Transport: SSE (legacy)")
         starlette_app = mcp.sse_app()
+
+    starlette_app.router.routes.append(_shot_route)
 
     # Host header validation
     allowed_hosts = config.get_allowed_hosts()

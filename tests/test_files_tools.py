@@ -93,3 +93,29 @@ async def test_move_and_info_and_delete(tmp_path):
 async def test_write_requires_content(tmp_path):
     result = json.loads(await _call("write", path=str(tmp_path / "x.txt")))
     assert "requires params: content_base64" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_read_as_url_returns_download_url(tmp_path):
+    from types import SimpleNamespace as NS
+
+    from remote_claws.shots import ShotRegistry
+
+    target = tmp_path / "big.bin"
+    target.write_bytes(b"x" * 100)
+    registry = ShotRegistry(ttl_seconds=600)
+
+    result = await run_action(
+        group="files",
+        handlers=HANDLERS,
+        action="read",
+        app=NS(shots=registry),
+        params={"path": str(target), "as_url": True, "request_host": "lucca:3030"},
+        permissions=_AllowAll(),
+    )
+    data = json.loads(result)
+    assert data["size_bytes"] == 100
+    assert data["url"].startswith("http://lucca:3030/dl/")
+    assert "content_base64" not in data
+    name = data["url"].rsplit("/", 1)[-1]
+    assert registry.resolve(name) == target

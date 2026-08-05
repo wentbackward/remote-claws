@@ -64,7 +64,7 @@ actions over coordinates — coordinates break when windows move.
 
 | Action | Params | Description |
 |--------|--------|-------------|
-| `screenshot` | `region=None` ([x,y,w,h]), `save_to_disk=false` | JPEG of the full screen or region, returned inline. With `save_to_disk=true`: save a PNG to the remote temp dir and return `{"path", "size_bytes"}` as text instead — for models that can't accept inline images; fetch via `remote_files` `read`. Each save deletes the previous temp file. |
+| `screenshot` | `region=None` ([x,y,w,h]), `save_to_disk=false` | JPEG of the full screen or region, returned inline. With `save_to_disk=true`: save a PNG and return `{"path", "size_bytes", "url", "expires_in"}` as text — pass `url` to a tool that fetches out-of-band (e.g. an image analyzer). URL expires after `shot_ttl_seconds` (default 600). |
 | `mouse_click` | `x`, `y` (required), `button="left"`, `clicks=1` | Click at screen coordinates. `clicks=2` = double-click. |
 | `mouse_move` | `x`, `y` (required), `duration=0.2` | Move cursor to coordinates. |
 | `mouse_drag` | `start_x`, `start_y`, `end_x`, `end_y` (required), `duration=0.5` | Drag between coordinates. |
@@ -98,7 +98,7 @@ Read and write files on the REMOTE machine. Binary content is base64-encoded.
 
 | Action | Params | Description |
 |--------|--------|-------------|
-| `read` | `path` (required), `offset=0`, `limit=0` | `{path, size, offset, bytes_read, content_base64}`. `limit=0` reads whole file; use offset/limit to chunk large files. |
+| `read` | `path` (required), `offset=0`, `limit=0`, `as_url=false` | `{path, size, offset, bytes_read, content_base64}`. `limit=0` reads whole file; use offset/limit to chunk large files. With `as_url=true`: return `{"path", "size_bytes", "url", "expires_in"}` instead of content — for large binaries, hand the URL to a tool that fetches out-of-band. |
 | `write` | `path` (required), `content_base64` (required), `make_dirs=true` | Write decoded bytes to path; creates parent dirs when `make_dirs`. |
 | `list` | `path="."`, `pattern="*"`, `recursive=false` | Glob listing with `{path, is_dir, size, modified}`. Capped at 500 entries. |
 | `delete` | `path` (required) | Delete a file or EMPTY directory. |

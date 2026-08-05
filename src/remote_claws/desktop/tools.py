@@ -3,8 +3,6 @@ from __future__ import annotations
 import io
 import json
 import tempfile
-import threading
-from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,40 +14,42 @@ from remote_claws.dispatch import Handler, run_action
 from remote_claws.permissions import PermissionChecker
 from remote_claws.screenshot import downscale_and_encode
 
-# save_to_disk screenshot state: the previous temp file is deleted on the
-# next save — these files exist to be fetched once via remote_files read,
-# not to accumulate. The lock guards the delete-then-write sequence because
-# sync handlers run in a thread pool.
-_SCREENSHOT_LOCK = threading.Lock()
-_LAST_SCREENSHOT: Path | None = None
 
+def _save_screenshot_png(raw_png: bytes, app: Any, request_host: str = "") -> str:
+    """Downscale per config, save as PNG in the remote machine's temp dir,
+    and register a short-lived download URL for it.
 
-def _save_screenshot_png(raw_png: bytes, app: Any) -> str:
-    """Downscale per config and save as PNG in the remote machine's temp dir.
-
-    Returns a JSON string ({"path", "size_bytes"}) instead of image content,
-    for agents whose model cannot accept inline images: fetch the path via
-    remote_files read and hand it to an image-analysis tool.
+    Returns a JSON string instead of image content, for agents whose model
+    cannot accept inline images — and to keep large binaries out of model
+    context entirely. Pass the URL to a tool that fetches out-of-band (e.g.
+    an image analyzer); do NOT remote_files read the screenshot.
     """
-    global _LAST_SCREENSHOT
     img = PILImage.open(io.BytesIO(raw_png))
     img.thumbnail(
         (app.config.screenshot_max_width, app.config.screenshot_max_height),
         PILImage.LANCZOS,
     )
 
-    with _SCREENSHOT_LOCK:
-        if _LAST_SCREENSHOT is not None:
-            with suppress(OSError):
-                _LAST_SCREENSHOT.unlink()
-        path = Path(tempfile.gettempdir()) / f"remote-desktop-screenshot-{datetime.now():%Y%m%d-%H%M%S-%f}.png"
-        img.save(path, format="PNG")
-        _LAST_SCREENSHOT = path
+    path = Path(tempfile.gettempdir()) / f"remote-desktop-screenshot-{datetime.now():%Y%m%d-%H%M%S-%f}.png"
+    img.save(path, format="PNG")
+    name = app.shots.register(path)
 
-    return json.dumps({"path": str(path), "size_bytes": path.stat().st_size})
+    result: dict[str, Any] = {
+        "path": str(path),
+        "size_bytes": path.stat().st_size,
+        "expires_in": app.shots.ttl_seconds,
+    }
+    if request_host:
+        result["url"] = f"http://{request_host}/dl/{name}"
+    return json.dumps(result)
 
 
-def h_screenshot(app: Any, region: list[int] | None = None, save_to_disk: bool = False) -> Image | str:
+def h_screenshot(
+    app: Any,
+    region: list[int] | None = None,
+    save_to_disk: bool = False,
+    request_host: str = "",
+) -> Image | str:
     import pyautogui
 
     pil_img = pyautogui.screenshot(region=tuple(region)) if region and len(region) == 4 else pyautogui.screenshot()
@@ -57,7 +57,7 @@ def h_screenshot(app: Any, region: list[int] | None = None, save_to_disk: bool =
     pil_img.save(buf, format="PNG")
 
     if save_to_disk:
-        return _save_screenshot_png(buf.getvalue(), app)
+        return _save_screenshot_png(buf.getvalue(), app, request_host)
 
     jpeg_bytes, _saved = downscale_and_encode(
         buf.getvalue(),
@@ -276,10 +276,11 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         Capture
           screenshot [region=[x,y,w,h]] [save_to_disk=false]
               JPEG of the full screen or a region, returned inline.
-              save_to_disk=true: save a PNG to the remote temp dir and return
-              {"path", "size_bytes"} as TEXT instead of an image — for models
-              that cannot accept inline images. Fetch via remote_files read.
-              Each save deletes the previous temp screenshot.
+              save_to_disk=true: save a PNG and return {"path", "size_bytes",
+              "url", "expires_in"} as TEXT — for models that cannot accept
+              inline images, and to keep binaries out of your context. Pass the
+              url to a tool that fetches out-of-band (e.g. an image analyzer);
+              do NOT remote_files read the screenshot.
 
         Mouse
           mouse_click x=<px> y=<px> [button=left] [clicks=1]      clicks=2 = double-click
@@ -305,6 +306,11 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
         permission error — do not retry them.
         """
         app = ctx.request_context.lifespan_context
+        # Host the client used to reach us — used to build download URLs for
+        # saved artifacts. Threaded through the dispatcher internally; never
+        # part of the tool's public schema.
+        request = getattr(ctx.request_context, "request", None)
+        request_host = request.headers.get("host", "") if request is not None else ""
         return await run_action(
             group="desktop",
             handlers=HANDLERS,
@@ -313,6 +319,7 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
             params={
                 "region": region,
                 "save_to_disk": save_to_disk,
+                "request_host": request_host,
                 "x": x,
                 "y": y,
                 "start_x": start_x,

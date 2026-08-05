@@ -1,6 +1,6 @@
 [project]
 name = "remote-claws"
-version = "1.2.8"
+version = "1.2.9"
 description = "MCP server for remote machine control — browser, desktop, exec, and file transfer"
 requires-python = ">=3.11"
 dependencies = [
