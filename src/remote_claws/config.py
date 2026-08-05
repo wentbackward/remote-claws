@@ -75,9 +75,14 @@ class AppConfig(BaseSettings):
     screenshot_max_height: int = 960
     screenshot_quality: int = 75
     screenshot_dir: str = ""
-    # Seconds a /shots/ download URL stays valid after a screenshot is saved.
+    # Seconds a /dl/ download URL stays valid after a screenshot is saved.
     # Files are also evicted when more than MAX_SHOTS (32) are outstanding.
     shot_ttl_seconds: int = 600
+    # Maximum bytes remote_files read returns inline (base64). Larger reads
+    # hard-error with guidance to use as_url — base64 in a tool result
+    # explodes model context, and there is no legitimate reason to inline
+    # anything this big.
+    max_inline_bytes: int = 1_048_576
     permissions_file: str = "permissions.json"
     allowed_ips: str = ""  # comma-separated; empty = allow all (rely on token auth only)
     auth_file: str = ".remote-claws-auth.json"

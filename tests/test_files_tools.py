@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from remote_claws.config import AppConfig
 from remote_claws.dispatch import run_action
 from remote_claws.files.tools import HANDLERS
 
@@ -15,7 +16,21 @@ class _AllowAll:
         return True
 
 
-async def _call(action: str, **params):
+def _app(tmp_path, **config_overrides):
+    return SimpleNamespace(
+        config=AppConfig(
+            permissions_file=str(tmp_path / "p.json"),
+            auth_file=str(tmp_path / "a.json"),
+            **config_overrides,
+        )
+    )
+
+
+def _default_app():
+    return SimpleNamespace(config=AppConfig())
+
+
+async def _call(action: str, app=None, **params):
     full = {
         "path": "",
         "content_base64": "",
@@ -28,9 +43,8 @@ async def _call(action: str, **params):
         "dst": "",
     }
     full.update(params)
-    # files handlers ignore app; SimpleNamespace documents that explicitly
     return await run_action(
-        group="files", handlers=HANDLERS, action=action, app=SimpleNamespace(), params=full, permissions=_AllowAll()
+        group="files", handlers=HANDLERS, action=action, app=app or _default_app(), params=full, permissions=_AllowAll()
     )
 
 
@@ -119,3 +133,30 @@ async def test_read_as_url_returns_download_url(tmp_path):
     assert "content_base64" not in data
     name = data["url"].rsplit("/", 1)[-1]
     assert registry.resolve(name) == target
+
+
+@pytest.mark.asyncio
+async def test_read_over_inline_cap_hard_errors(tmp_path):
+    target = tmp_path / "big.bin"
+    target.write_bytes(b"x" * 1000)
+    app = _app(tmp_path, max_inline_bytes=100)
+
+    result = json.loads(await _call("read", app=app, path=str(target)))
+    assert "inline read would return 1,000 bytes (cap 100)" in result["error"]
+    assert "as_url=true" in result["error"]  # recovery is named in the error
+    assert result["size_bytes"] == 1000
+    assert result["cap_bytes"] == 100
+
+
+@pytest.mark.asyncio
+async def test_read_under_cap_with_limit_still_works(tmp_path):
+    target = tmp_path / "big.bin"
+    target.write_bytes(b"x" * 1000)
+    app = _app(tmp_path, max_inline_bytes=100)
+
+    # A chunk that fits under the cap is served inline as normal.
+    ok = json.loads(await _call("read", app=app, path=str(target), offset=0, limit=50))
+    assert ok["bytes_read"] == 50
+    # A chunk that still exceeds the cap errors too.
+    over = json.loads(await _call("read", app=app, path=str(target), offset=0, limit=500))
+    assert "inline read would return 500 bytes (cap 100)" in over["error"]

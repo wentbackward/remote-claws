@@ -98,7 +98,7 @@ Read and write files on the REMOTE machine. Binary content is base64-encoded.
 
 | Action | Params | Description |
 |--------|--------|-------------|
-| `read` | `path` (required), `offset=0`, `limit=0`, `as_url=false` | `{path, size, offset, bytes_read, content_base64}`. `limit=0` reads whole file; use offset/limit to chunk large files. With `as_url=true`: return `{"path", "size_bytes", "url", "expires_in"}` instead of content — for large binaries, hand the URL to a tool that fetches out-of-band. |
+| `read` | `path` (required), `offset=0`, `limit=0`, `as_url=false` | `{path, size, offset, bytes_read, content_base64}`. `limit=0` reads whole file; use offset/limit to chunk. Inline reads are **capped** (`max_inline_bytes`, default 1MB) — over-cap reads fail with `"inline read would return N bytes"`; re-issue with `as_url=true`. With `as_url=true`: return `{"path", "size_bytes", "url", "expires_in"}` instead of content — for large binaries, hand the URL to a tool that fetches out-of-band. |
 | `write` | `path` (required), `content_base64` (required), `make_dirs=true` | Write decoded bytes to path; creates parent dirs when `make_dirs`. |
 | `list` | `path="."`, `pattern="*"`, `recursive=false` | Glob listing with `{path, is_dir, size, modified}`. Capped at 500 entries. |
 | `delete` | `path` (required) | Delete a file or EMPTY directory. |

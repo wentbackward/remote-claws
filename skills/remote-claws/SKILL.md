@@ -65,6 +65,10 @@ and [README](https://github.com/wentbackward/remote-claws#security).
   `remote_files(action="read", path=..., as_url=true)` for any file) — you get
   a short-lived download URL. Hand the URL to the image tool, which fetches it
   gateway-side and routes to the vision-capable imageModel.
+- **Inline read cap:** plain `remote_files(action="read", ...)` returns base64
+  only up to 1MB. Bigger reads fail with `"inline read would return N bytes"`.
+  Recovery: re-issue the same read with `as_url=true` and use the returned
+  URL — do NOT retry the plain read. Small chunks via offset/limit still work.
 - `type_text` is ASCII only. For Unicode, use browser `fill`, or clipboard:
   `remote_exec(action="run", command="powershell", args=["Set-Clipboard", ...])`
   then `remote_desktop(action="press_key", keys="ctrl+v")`.

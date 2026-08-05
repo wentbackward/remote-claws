@@ -48,6 +48,26 @@ def h_read(
             result["url"] = f"http://{request_host}/dl/{name}"
         return json.dumps(result)
 
+    # Hard cap on inline (base64) reads: a big base64 payload in a tool
+    # result explodes model context. Over-cap reads fail with guidance —
+    # the agent recovers with as_url=true or a smaller offset/limit chunk.
+    inline_bytes = min(limit, file_size - offset) if limit > 0 else file_size - offset
+    inline_bytes = max(0, inline_bytes)
+    cap = app.config.max_inline_bytes
+    if inline_bytes > cap:
+        return json.dumps(
+            {
+                "error": (
+                    f"inline read would return {inline_bytes:,} bytes (cap {cap:,}). "
+                    "Re-issue with as_url=true for a download URL, or read a "
+                    "smaller chunk with offset/limit."
+                ),
+                "size_bytes": file_size,
+                "inline_bytes": inline_bytes,
+                "cap_bytes": cap,
+            }
+        )
+
     with open(p, "rb") as f:
         if offset > 0:
             f.seek(offset)
@@ -164,6 +184,8 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
           read path=<path> [offset=0] [limit=0] [as_url=false]
               Return file content as {path, size, offset, bytes_read, content_base64}.
               limit=0 reads the whole file; use offset/limit to chunk large files.
+              Inline reads are CAPPED (default 1MB): over-cap reads fail with
+              "inline read would return N bytes" — re-issue with as_url=true.
               as_url=true returns {"path", "size_bytes", "url", "expires_in"}
               instead of content — use for LARGE BINARIES (images, video, PDF):
               hand the url to a tool that fetches out-of-band. Never base64 a
