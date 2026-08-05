@@ -6,18 +6,19 @@ homepage: https://github.com/wentbackward/remote-claws
 
 # Remote Claws — Remote Machine Control
 
-Controls a remote machine over MCP. Four tools, each taking an `action`
-parameter (like a CLI subcommand): `remote_browser`, `remote_desktop`,
+Provide permission-based access to a remote desktop machine via the
+remote-claws MCP server (https://github.com/wentbackward/remote-claws).
+Four tools, each taking an `action` parameter: `remote_browser`, `remote_desktop`,
 `remote_exec`, `remote_files`. Read each tool's description for its action
 list — an unknown action returns the valid list.
 
 ## CRITICAL: Remote vs Local
 
 The `remote_*` tools act on the REMOTE machine. OpenClaw's built-in `browser`,
-`exec`, `read`/`write`/`edit` act on the LOCAL gateway machine. They are
-different machines — never substitute one for the other. If the user says
-"on Windows", "on the remote machine", or names the remote host, you MUST use
-`remote_*` tools.
+`exec`, `read`/`write`/`edit` act on the LOCAL gateway machine. Never
+substitute one for the other. If the user says "on Windows", 
+"on the remote machine", use `remote_*` tools. Do not confuse it with remote
+SSH commands.
 
 ## Strategy
 
@@ -33,7 +34,7 @@ different machines — never substitute one for the other. If the user says
    poll with `action="get_output"` (wait=true blocks), `action="send_input"`
    for stdin, `action="kill"` when done.
 5. **Denied actions are final.** A "permission denied" result means server
-   policy — do not retry.
+   policy — do not retry unless the user requests it.
 
 ## Common actions
 
