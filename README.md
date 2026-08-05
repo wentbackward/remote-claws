@@ -315,7 +315,9 @@ Env vars override the config file. All use the `REMOTE_CLAWS_` prefix:
 | `REMOTE_CLAWS_SCREENSHOT_MAX_WIDTH` | `1280` | Max screenshot width |
 | `REMOTE_CLAWS_SCREENSHOT_HEIGHT` | `960` | Max screenshot height |
 | `REMOTE_CLAWS_SCREENSHOT_QUALITY` | `75` | JPEG quality (1-100) |
-| `REMOTE_CLAWS_SCREENSHOT_DIR` | *(empty)* | Directory to save screenshots (when `save_to_disk=true`) |
+| `REMOTE_CLAWS_SCREENSHOT_DIR` | *(empty)* | Audit directory for `remote_browser` screenshot copies (when set) |
+| `REMOTE_CLAWS_SHOT_TTL_SECONDS` | `600` | Seconds a `/dl/` capability-URL download stays valid |
+| `REMOTE_CLAWS_MAX_INLINE_BYTES` | `1048576` | Max bytes `remote_files` `read` returns inline (base64) before hard-erroring with an `as_url` recovery |
 | `REMOTE_CLAWS_CONFIG_FILE` | `remote-claws.json` | Path to the JSON config file |
 
 ### Priority

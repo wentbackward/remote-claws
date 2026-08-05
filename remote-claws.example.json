@@ -10,6 +10,8 @@
   "screenshot_max_width": 1280,
   "screenshot_max_height": 960,
   "screenshot_quality": 75,
+  "shot_ttl_seconds": 600,
+  "max_inline_bytes": 1048576,
   "permissions_file": "permissions.json",
   "auth_file": ".remote-claws-auth.json",
   "enabled_groups": "browser,desktop,exec,files",

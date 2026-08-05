@@ -33,6 +33,8 @@ Key settings:
 - `REMOTE_CLAWS_PERMISSIONS_FILE` (default: `permissions.json`)
 - `REMOTE_CLAWS_ENABLED_GROUPS` (default: `browser,desktop,exec,files`): comma-separated list of tool groups to load at startup. Groups not listed are never imported (Playwright / pyautogui are not loaded), and none of their tools are registered. Use this to keep heavy dependencies out of memory on machines that don't need them.
 - `REMOTE_CLAWS_TRANSPORT` (default: `streamable-http`): MCP transport — `streamable-http` or legacy `sse`. Only one is served at a time.
+- `REMOTE_CLAWS_SHOT_TTL_SECONDS` (default: `600`): validity window for `/dl/` capability-URL downloads.
+- `REMOTE_CLAWS_MAX_INLINE_BYTES` (default: `1048576`): inline base64 cap for `remote_files` `read`; larger reads hard-error and must use `as_url`.
 - `REMOTE_CLAWS_AUTH_FILE` (default: `.remote-claws-auth.json`)
 - `REMOTE_CLAWS_CONFIG_FILE` (default: `remote-claws.json`)
 
