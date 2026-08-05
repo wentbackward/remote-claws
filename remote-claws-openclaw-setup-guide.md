@@ -205,6 +205,7 @@ remote machine's hostname.
 | `401 Unauthorized` | Wrong or missing bearer token | Check the token in `openclaw.json` matches what `remote-claws-setup` printed; run `openclaw mcp reload` after fixing |
 | `403 Forbidden` | IP not in allowlist | Add OpenClaw server's IP to `allowed_ips`, or remove the setting to disable IP filtering |
 | `/sse` errors in the Remote Claws log | OpenClaw fallback-probing the legacy endpoint | Safe to ignore — it settles on streamable-http |
+| Image tool can't fetch a `/dl/` URL (but gateway `curl` can) | OpenClaw-internal policy: sandbox egress, or the image tool's URL/path allowlist. Not a Remote Claws issue — the endpoint is reachable and correct | Fetch via an unsandboxed tool, or add the Tailscale range to the sandbox allowlist |
 | Connection refused / timeout | Remote Claws not running | Start it on the remote machine (Windows: `.\start.ps1`; macOS: `remote-claws` in the venv) and keep the terminal open |
 | Tools not available to agent | MCP config not loaded | `openclaw mcp reload`, then `openclaw gateway restart` if still missing; watch `openclaw logs --follow` |
 
