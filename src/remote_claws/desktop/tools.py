@@ -2,28 +2,68 @@ from __future__ import annotations
 
 import io
 import json
+import tempfile
+import threading
+from contextlib import suppress
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP, Image
+from PIL import Image as PILImage
 
 from remote_claws.dispatch import Handler, run_action
 from remote_claws.permissions import PermissionChecker
-from remote_claws.screenshot import downscale_and_encode, make_save_path
+from remote_claws.screenshot import downscale_and_encode
+
+# save_to_disk screenshot state: the previous temp file is deleted on the
+# next save — these files exist to be fetched once via remote_files read,
+# not to accumulate. The lock guards the delete-then-write sequence because
+# sync handlers run in a thread pool.
+_SCREENSHOT_LOCK = threading.Lock()
+_LAST_SCREENSHOT: Path | None = None
 
 
-def h_screenshot(app: Any, region: list[int] | None = None, save_to_disk: bool = False) -> Image:
+def _save_screenshot_png(raw_png: bytes, app: Any) -> str:
+    """Downscale per config and save as PNG in the remote machine's temp dir.
+
+    Returns a JSON string ({"path", "size_bytes"}) instead of image content,
+    for agents whose model cannot accept inline images: fetch the path via
+    remote_files read and hand it to an image-analysis tool.
+    """
+    global _LAST_SCREENSHOT
+    img = PILImage.open(io.BytesIO(raw_png))
+    img.thumbnail(
+        (app.config.screenshot_max_width, app.config.screenshot_max_height),
+        PILImage.LANCZOS,
+    )
+
+    with _SCREENSHOT_LOCK:
+        if _LAST_SCREENSHOT is not None:
+            with suppress(OSError):
+                _LAST_SCREENSHOT.unlink()
+        path = Path(tempfile.gettempdir()) / f"remote-desktop-screenshot-{datetime.now():%Y%m%d-%H%M%S-%f}.png"
+        img.save(path, format="PNG")
+        _LAST_SCREENSHOT = path
+
+    return json.dumps({"path": str(path), "size_bytes": path.stat().st_size})
+
+
+def h_screenshot(app: Any, region: list[int] | None = None, save_to_disk: bool = False) -> Image | str:
     import pyautogui
 
     pil_img = pyautogui.screenshot(region=tuple(region)) if region and len(region) == 4 else pyautogui.screenshot()
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG")
-    save_path = make_save_path(app.config.screenshot_dir) if save_to_disk else None
+
+    if save_to_disk:
+        return _save_screenshot_png(buf.getvalue(), app)
+
     jpeg_bytes, _saved = downscale_and_encode(
         buf.getvalue(),
         max_width=app.config.screenshot_max_width,
         max_height=app.config.screenshot_max_height,
         quality=app.config.screenshot_quality,
-        save_path=save_path,
     )
     return Image(data=jpeg_bytes, format="jpeg")
 
@@ -235,7 +275,11 @@ def register(mcp: FastMCP, permissions: PermissionChecker) -> None:
 
         Capture
           screenshot [region=[x,y,w,h]] [save_to_disk=false]
-              JPEG of the full screen or a region.
+              JPEG of the full screen or a region, returned inline.
+              save_to_disk=true: save a PNG to the remote temp dir and return
+              {"path", "size_bytes"} as TEXT instead of an image — for models
+              that cannot accept inline images. Fetch via remote_files read.
+              Each save deletes the previous temp screenshot.
 
         Mouse
           mouse_click x=<px> y=<px> [button=left] [clicks=1]      clicks=2 = double-click

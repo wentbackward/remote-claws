@@ -102,11 +102,7 @@ class AppConfig(BaseSettings):
         # defaults. pydantic-settings ranks init kwargs ABOVE env vars, so
         # file values must not be passed for fields whose env var is set —
         # otherwise the file would silently beat the environment.
-        merged = {
-            key: value
-            for key, value in file_values.items()
-            if f"REMOTE_CLAWS_{key.upper()}" not in os.environ
-        }
+        merged = {key: value for key, value in file_values.items() if f"REMOTE_CLAWS_{key.upper()}" not in os.environ}
         merged.update(overrides)
         super().__init__(**merged)
         # Retained for source_of() provenance reporting.

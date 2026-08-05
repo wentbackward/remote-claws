@@ -64,7 +64,7 @@ actions over coordinates — coordinates break when windows move.
 
 | Action | Params | Description |
 |--------|--------|-------------|
-| `screenshot` | `region=None` ([x,y,w,h]), `save_to_disk=false` | JPEG of the full screen or a region. |
+| `screenshot` | `region=None` ([x,y,w,h]), `save_to_disk=false` | JPEG of the full screen or region, returned inline. With `save_to_disk=true`: save a PNG to the remote temp dir and return `{"path", "size_bytes"}` as text instead — for models that can't accept inline images; fetch via `remote_files` `read`. Each save deletes the previous temp file. |
 | `mouse_click` | `x`, `y` (required), `button="left"`, `clicks=1` | Click at screen coordinates. `clicks=2` = double-click. |
 | `mouse_move` | `x`, `y` (required), `duration=0.2` | Move cursor to coordinates. |
 | `mouse_drag` | `start_x`, `start_y`, `end_x`, `end_y` (required), `duration=0.5` | Drag between coordinates. |

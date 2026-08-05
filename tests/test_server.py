@@ -80,8 +80,9 @@ async def test_app_lifespan_yields_process_singleton(tmp_path, monkeypatch):
 
     # Deny-all permissions: no browser group, so no BrowserManager/preflight.
     checker = PermissionChecker(str(tmp_path / "missing.json"), enabled_groups=["exec"])
-    monkeypatch.setattr(server, "_CONFIG", AppConfig(permissions_file=str(tmp_path / "p.json"),
-                                                     auth_file=str(tmp_path / "a.json")))
+    monkeypatch.setattr(
+        server, "_CONFIG", AppConfig(permissions_file=str(tmp_path / "p.json"), auth_file=str(tmp_path / "a.json"))
+    )
     monkeypatch.setattr(server, "_PERMISSIONS", checker)
     monkeypatch.setattr(server, "_APP_CONTEXT", None)
 

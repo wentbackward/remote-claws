@@ -59,6 +59,10 @@ and [README](https://github.com/wentbackward/remote-claws#security).
 ## Important Notes
 
 - Screenshots are JPEG, max 1280x960. Coordinates are absolute pixels.
+- **Text-only model?** If your primary model can't accept inline images, call
+  `remote_desktop(action="screenshot", save_to_disk=true)` — it returns a file
+  path as text. Fetch the file with `remote_files(action="read", path=...)` and
+  hand it to the image tool, which routes to the vision-capable imageModel.
 - `type_text` is ASCII only. For Unicode, use browser `fill`, or clipboard:
   `remote_exec(action="run", command="powershell", args=["Set-Clipboard", ...])`
   then `remote_desktop(action="press_key", keys="ctrl+v")`.
